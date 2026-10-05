@@ -173,6 +173,10 @@ def geojson_to_dataframe(data: dict) -> tuple[pd.DataFrame, dict[str, int], list
         rows.append(row)
 
     df = pd.DataFrame(rows)
+    # fetch_overture.slim_feature writes is_named only when it is False, to keep
+    # map files small. Restore the default, or "is_named = TRUE" matches nothing.
+    if "is_named" in df.columns:
+        df["is_named"] = df["is_named"].astype("boolean").fillna(True)
     if "geom_type" not in df.columns:
         for c in GEO_COLUMNS:
             df[c] = None

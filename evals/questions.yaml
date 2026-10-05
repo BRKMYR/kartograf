@@ -1,0 +1,133 @@
+# Kartograf eval set: 20 questions over the Frankfurt Overture extract
+# (fetch_overture.py --preset frankfurt --places). Tables: places, roads, road_stats.
+#
+# Every answerable question has a reference_sql. The expected answer is computed
+# from it at run time against the same data, so the set stays valid when the
+# release changes. Distance questions give the anchor coordinates, because the
+# places data contains misplaced and duplicate station names.
+#
+# check:
+#   number   pass if any number in the answer matches the reference (rel_tol or abs_tol)
+#   set      pass if the answer names every value the reference returns
+#   refusal  the data cannot answer it; pass if the model says so instead of inventing
+
+# ---------------------------------------------------------------- English
+- id: en01
+  lang: en
+  question: How many pharmacies are within 1 km of Frankfurt Hauptbahnhof (lon 8.6625, lat 50.1070)?
+  check: number
+  reference_sql: SELECT count(*) FROM places WHERE category = 'pharmacy' AND ST_Distance_Sphere(ST_Point(lon, lat), ST_Point(8.6625, 50.1070)) <= 1000
+
+- id: en02
+  lang: en
+  question: How many kilometres of motorway are in the road data?
+  check: number
+  rel_tol: 0.01
+  reference_sql: SELECT sum(length_km) FROM roads WHERE class = 'motorway'
+
+- id: en03
+  lang: en
+  question: Which road class has the largest total length?
+  check: set
+  reference_sql: SELECT class FROM roads GROUP BY 1 ORDER BY sum(length_km) DESC LIMIT 1
+
+- id: en04
+  lang: en
+  question: How many places are marked as permanently closed?
+  check: number
+  reference_sql: SELECT count(*) FROM places WHERE operating_status = 'permanently_closed'
+
+- id: en05
+  lang: en
+  question: How many EV charging stations are within 3 km of the Messe Frankfurt (lon 8.6466, lat 50.1117)?
+  check: number
+  reference_sql: SELECT count(*) FROM places WHERE category = 'ev_charging_station' AND ST_Distance_Sphere(ST_Point(lon, lat), ST_Point(8.6466, 50.1117)) <= 3000
+
+- id: en06
+  lang: en
+  question: What are the three most common place categories? Ignore places without a category.
+  check: set
+  reference_sql: SELECT category FROM places WHERE category IS NOT NULL GROUP BY 1 ORDER BY count(*) DESC LIMIT 3
+
+- id: en07
+  lang: en
+  question: How many museums are within 1.5 km of the Römer (lon 8.6821, lat 50.1106)?
+  check: number
+  reference_sql: SELECT count(*) FROM places WHERE category = 'museum' AND ST_Distance_Sphere(ST_Point(lon, lat), ST_Point(8.6821, 50.1106)) <= 1500
+
+- id: en08
+  lang: en
+  question: What is the average confidence score of restaurants, to two decimals?
+  check: number
+  abs_tol: 0.01
+  reference_sql: SELECT avg(confidence) FROM places WHERE category = 'restaurant'
+
+- id: en09
+  lang: en
+  question: How many traffic accidents happened on the A5 last year?
+  check: refusal
+
+- id: en10
+  lang: en
+  question: What is the speed limit on the A66?
+  check: refusal
+
+# ---------------------------------------------------------------- Deutsch
+- id: de01
+  lang: de
+  question: Wie viele Krankenhäuser liegen im Umkreis von 2 km um den Römer (lon 8.6821, lat 50.1106)?
+  check: number
+  reference_sql: SELECT count(*) FROM places WHERE category = 'hospital' AND ST_Distance_Sphere(ST_Point(lon, lat), ST_Point(8.6821, 50.1106)) <= 2000
+
+- id: de02
+  lang: de
+  question: Wie viele Kilometer Straßen der Klasse trunk enthält der Datensatz?
+  check: number
+  rel_tol: 0.01
+  reference_sql: SELECT sum(length_km) FROM roads WHERE class = 'trunk'
+
+- id: de03
+  lang: de
+  question: Wie viele Restaurants gibt es im Umkreis von 500 m um die Hauptwache (lon 8.6791, lat 50.1137)?
+  check: number
+  reference_sql: SELECT count(*) FROM places WHERE category = 'restaurant' AND ST_Distance_Sphere(ST_Point(lon, lat), ST_Point(8.6791, 50.1137)) <= 500
+
+- id: de04
+  lang: de
+  question: Wie viele Apotheken sind als dauerhaft geschlossen markiert?
+  check: number
+  reference_sql: SELECT count(*) FROM places WHERE category = 'pharmacy' AND operating_status = 'permanently_closed'
+
+- id: de05
+  lang: de
+  question: Wie viele Straßensegmente der Klasse primary gibt es?
+  check: number
+  reference_sql: SELECT count(*) FROM roads WHERE class = 'primary'
+
+- id: de06
+  lang: de
+  question: Wie viele Cafés liegen im Umkreis von 1 km um die Hauptwache (lon 8.6791, lat 50.1137)?
+  check: number
+  reference_sql: SELECT count(*) FROM places WHERE category = 'cafe' AND ST_Distance_Sphere(ST_Point(lon, lat), ST_Point(8.6791, 50.1137)) <= 1000
+
+- id: de07
+  lang: de
+  question: Wie viele Grundschulen liegen im Umkreis von 2 km um den Römer (lon 8.6821, lat 50.1106)?
+  check: number
+  reference_sql: SELECT count(*) FROM places WHERE category = 'elementary_school' AND ST_Distance_Sphere(ST_Point(lon, lat), ST_Point(8.6821, 50.1106)) <= 2000
+
+- id: de08
+  lang: de
+  question: Wie viele verschiedene Namen haben die Autobahnsegmente (Klasse motorway)? Segmente ohne Namen nicht mitzählen.
+  check: number
+  reference_sql: SELECT count(DISTINCT name) FROM roads WHERE class = 'motorway' AND name IS NOT NULL AND name <> ''
+
+- id: de09
+  lang: de
+  question: Wie viele Baustellen gibt es aktuell in Frankfurt?
+  check: refusal
+
+- id: de10
+  lang: de
+  question: Wie hoch ist die durchschnittliche Miete im Westend?
+  check: refusal

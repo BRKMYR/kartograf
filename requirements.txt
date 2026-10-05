@@ -5,5 +5,6 @@ altair>=5.0
 pydeck>=0.9
 anthropic>=1.5
 ollama>=0.4
+pyyaml>=6.0
 # tests
 pytest>=8.0

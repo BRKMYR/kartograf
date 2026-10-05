@@ -210,3 +210,15 @@ def test_source_property_is_never_overwritten_by_derived_column():
     assert any("length_km" in n for n in t.notes)
     s = DataStore(); s.add(t)
     assert "geom_length_km" in s.schema_description()
+
+
+def test_is_named_default_is_restored():
+    """Compact road files omit is_named when it is True; the loader restores it."""
+    fc = {"type": "FeatureCollection", "features": [
+        {"type": "Feature", "id": "a", "properties": {"class": "motorway", "name": "A 5"},
+         "geometry": {"type": "LineString", "coordinates": [[8.6, 50.1], [8.61, 50.1]]}},
+        {"type": "Feature", "id": "b", "properties": {"class": "motorway", "is_named": False},
+         "geometry": {"type": "LineString", "coordinates": [[8.6, 50.1], [8.62, 50.1]]}},
+    ]}
+    t = load_file("roads.geojson", json.dumps(fc).encode())
+    assert t.df.set_index("feature_id")["is_named"].to_dict() == {"a": True, "b": False}
