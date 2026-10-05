@@ -1,4 +1,4 @@
-"""Geo Data Chat: ask questions about CSV and GeoJSON files in plain language.
+"""Kartograf: ask questions about CSV and GeoJSON files in plain language.
 
 Run:  streamlit run app.py
 """
@@ -26,7 +26,7 @@ SAMPLE_DIR = APP_DIR / "sample_data"
 OVERTURE_ROOT = scopes.DATA_ROOT
 LOG_PATH = APP_DIR / "query_log.jsonl"
 
-st.set_page_config(page_title="Geo Data Chat", page_icon="🗺️", layout="wide")
+st.set_page_config(page_title="Kartograf", page_icon="🗺️", layout="wide")
 
 # ----------------------------------------------------------------------------- state
 
@@ -126,7 +126,7 @@ def log_turn(question: str, result: ChatResult) -> None:
 # ----------------------------------------------------------------------------- sidebar
 
 with st.sidebar:
-    st.title("🗺️ Geo Data Chat")
+    st.title("🗺️ Kartograf")
     st.caption("CSV and GeoJSON in, questions in plain language, SQL you can audit.")
 
     st.subheader("Model")

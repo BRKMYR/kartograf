@@ -1,4 +1,4 @@
-# Geo Data Chat
+# Kartograf
 
 Ask questions about CSV and GeoJSON files in plain language, and track how a map
 dataset changes between releases. A Streamlit app with four working surfaces: a
