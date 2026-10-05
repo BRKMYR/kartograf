@@ -1,13 +1,15 @@
 /* Kartograf look for kepler.gl: the brkmyr.com palette and Inter Tight.
  *
  * Shared by web/index.html (served by server.py) and the pages kepler_view.py
- * builds for the Streamlit app. The palette is monochrome on warm paper, so the
- * data is drawn in ink and greys as well; the answer layer is the only solid ink.
+ * builds for the Streamlit app. A paper map: the base data is drawn in light
+ * warm greys, close to the basemap, and ink is reserved for what was asked
+ * (answer places, a clicked chart bar), so the answer is the only dark thing.
  */
 (function () {
   const C = {
     bg: "#eeeee8", paper: "#f6f6f1", panel: "#e6e6de", hover: "#dcdcd2",
-    ink: "#171712", sec: "#5a5a52", mute: "#8a8a80", rule: "#d7d7cd"
+    ink: "#171712", sec: "#5a5a52", mute: "#8a8a80", rule: "#d7d7cd",
+    road: "#a9a89e", place: "#9e9c90"
   };
   const rgb = function (hex) {
     return [1, 3, 5].map(function (i) { return parseInt(hex.slice(i, i + 2), 16); });
@@ -39,9 +41,10 @@
   }
 
   // Road classes in alphabetical order, which is how kepler's ordinal scale
-  // assigns colours: motorway and trunk dark, minor classes light.
+  // assigns colours. A narrow range of warm greys: motorway and trunk a little
+  // darker than minor roads, none of them close to ink.
   const ROAD_CLASSES = ["motorway", "primary", "secondary", "tertiary", "trunk"];
-  const ROAD_GREYS = [C.ink, C.sec, "#8a8a80", "#b4b4aa", "#2f2f29"];
+  const ROAD_GREYS = ["#8e8d83", "#a3a298", "#b3b2a8", "#c4c3b9", "#98978d"];
 
   function layer(d, answer) {
     const cols = d.columns || [];
@@ -50,11 +53,11 @@
       return {
         id: d.id, type: "geojson",
         config: {
-          dataId: d.id, label: d.label, color: rgb(answer ? C.ink : C.sec),
+          dataId: d.id, label: d.label, color: rgb(answer ? C.ink : C.road),
           columns: {geojson: "_geojson"}, isVisible: true,
           visConfig: {
-            opacity: 0.9, strokeOpacity: 0.9, thickness: answer ? 2 : 0.6,
-            strokeColor: rgb(answer ? C.ink : C.sec), stroked: true, filled: false,
+            opacity: answer ? 0.95 : 0.7, strokeOpacity: answer ? 0.95 : 0.7, thickness: answer ? 1.6 : 0.5,
+            strokeColor: rgb(answer ? C.ink : C.road), stroked: true, filled: false,
             strokeColorRange: {name: "Kartograf roads", type: "custom", category: "Custom",
                                colors: byClass && !answer ? ROAD_GREYS : [C.ink]}
           }
@@ -67,11 +70,11 @@
     return {
       id: d.id, type: "point",
       config: {
-        dataId: d.id, label: d.label, color: rgb(C.ink),
+        dataId: d.id, label: d.label, color: rgb(answer ? C.ink : C.place),
         columns: {lat: "lat", lng: "lon"}, isVisible: true,
         visConfig: answer
-          ? {radius: 7, opacity: 0.95, filled: true, outline: true, thickness: 2, strokeColor: rgb(C.bg)}
-          : {radius: 1.6, opacity: 0.22, filled: true}
+          ? {radius: 6, opacity: 0.95, filled: true, outline: true, thickness: 2, strokeColor: rgb(C.bg)}
+          : {radius: 1.2, opacity: 0.3, filled: true}
       }
     };
   }
