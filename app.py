@@ -16,6 +16,7 @@ import streamlit as st
 
 import attribution
 import charts
+import kepler_view
 import scopes
 import snapshots
 from data_loader import DataStore, dataframe_to_bytes, load_file, table_statistics
@@ -193,8 +194,18 @@ with st.sidebar:
 
 # ----------------------------------------------------------------------------- tabs
 
-tab_chat, tab_rel, tab_stats, tab_data, tab_log = st.tabs(
-    ["💬 Chat", "🛰️ Releases", "📊 Statistics", "🗂️ Data", "🧾 Query log"])
+tab_chat, tab_map, tab_rel, tab_stats, tab_data, tab_log = st.tabs(
+    ["💬 Chat", "🌍 Map", "🛰️ Releases", "📊 Statistics", "🗂️ Data", "🧾 Query log"])
+
+
+def show_kepler(datasets: dict[str, pd.DataFrame], height: int = 650) -> None:
+    """Render tables on a kepler.gl map in the viewer's theme."""
+    for name, df in datasets.items():
+        if len(df) > kepler_view.MAX_ROWS:
+            st.caption(f"`{name}`: showing the first {kepler_view.MAX_ROWS:,} of {len(df):,} rows.")
+    st.iframe(kepler_view.build_kepler_html(datasets, theme=theme_mode()), height=height)
+    st.caption(f"kepler.gl {kepler_view.KEPLER_VERSION}, rendered in your browser. "
+               + attribution.BASEMAP_ATTRIBUTION)
 
 with tab_chat:
     if not store.tables:
@@ -210,6 +221,9 @@ with tab_chat:
                         st.error(q["error"])
                     elif q["result"] is not None and not q["result"].empty:
                         st.dataframe(q["result"], width="stretch")
+                        if kepler_view.is_mappable(q["result"]) and st.toggle(
+                                "Show on map", key=f"map_{id(q)}_{q['purpose']}"):
+                            show_kepler({"result": q["result"]}, height=500)
             if turn.get("meta"):
                 st.caption(turn["meta"])
 
@@ -252,6 +266,22 @@ with tab_chat:
         })
         log_turn(question, result)
         st.rerun()
+
+with tab_map:
+    mappable = [n for n, t in store.tables.items() if kepler_view.is_mappable(t.df)]
+    if not mappable:
+        st.info("Load a GeoJSON file or a table with lon/lat columns to see it on the map.")
+    else:
+        picked = st.multiselect("Tables", mappable, default=mappable[:2])
+        map_sql = st.text_input("Or map a read-only query",
+                                placeholder="SELECT * FROM places WHERE category = 'pharmacy'")
+        try:
+            if map_sql.strip():
+                show_kepler({"query": store.run_sql(map_sql, max_rows=kepler_view.MAX_ROWS)})
+            elif picked:
+                show_kepler({n: store.tables[n].df for n in picked})
+        except Exception as e:
+            st.error(str(e))
 
 with tab_rel:
     mode = theme_mode()
