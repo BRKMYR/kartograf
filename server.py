@@ -59,7 +59,14 @@ CHART_MAX_BARS = 12
 DATA_CONTEXT = """Data context: every table covers the Frankfurt am Main area and nothing else.
 "Frankfurt" in a question means the whole table: do not filter by name, state or
 locality to find Frankfurt. The roads table holds classified roads only (motorway,
-trunk, primary, secondary, tertiary), not residential streets."""
+trunk, primary, secondary, tertiary), not residential streets.
+
+What the data does not contain: construction sites or roadworks, traffic, accidents,
+speed limits, opening hours, prices, rents, population or events. The places table
+lists businesses and points of interest; a construction company is not a
+construction site. When a question asks for something the tables do not record,
+say that the data does not contain it, name what it does contain, and do not
+report a count from a loosely related category."""
 
 # Simple single-table aggregates the server can break down for the chart:
 # SELECT <aggregate> FROM roads|places [WHERE ...]  (no joins, CTEs or GROUP BY).

@@ -17,9 +17,9 @@ language model writes spatial SQL, a read-only DuckDB database runs it, and the
 answer comes back with a chart, the matching places on a kepler.gl map, and every
 SQL statement behind it.
 
-This demo runs the model at a hosted inference endpoint. The project itself runs
-fully on a laptop with Ollama; code, eval set and results:
-[github.com/BRKMYR/kartograf](https://github.com/BRKMYR/kartograf).
+This demo runs Qwen3 235B (Instruct) at a hosted inference endpoint through
+Hugging Face Inference Providers. The project itself runs fully on a laptop with
+local models through Ollama.
 
 - One tool, `run_sql`. Every statement passes a read-only guard and runs with
   external access disabled and a 20-second timeout.

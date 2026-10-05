@@ -9,4 +9,3 @@ sample_data
 evals/results
 data/overture/*
 !data/overture/frankfurt
-data/overture/frankfurt/*.json
