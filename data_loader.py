@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from dataclasses import dataclass, field
 from io import BytesIO, StringIO
 from typing import Any, Iterable
@@ -279,9 +280,18 @@ class DataStore:
                    if self.spatial else "DuckDB spatial extension is NOT available; use lon/lat and bbox columns.")
         return "\n\n".join(parts) + "\n\n" + spatial
 
-    def run_sql(self, sql: str, max_rows: int = 200) -> pd.DataFrame:
+    def run_sql(self, sql: str, max_rows: int = 200, timeout: float = 20.0) -> pd.DataFrame:
+        """Run one read-only query. A watchdog interrupts it after `timeout` seconds,
+        so a runaway join (every place against every road) cannot hold the server."""
         check_sql_is_read_only(sql)
-        return self.con.execute(sql).fetchdf().head(max_rows)
+        timer = threading.Timer(timeout, self.con.interrupt)
+        timer.start()
+        try:
+            return self.con.execute(sql).fetchdf().head(max_rows)
+        except duckdb.InterruptException as e:
+            raise TimeoutError(f"query stopped after {timeout:.0f} s; narrow it down or aggregate first") from e
+        finally:
+            timer.cancel()
 
 
 _FORBIDDEN = re.compile(

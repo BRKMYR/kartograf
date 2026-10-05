@@ -150,7 +150,7 @@
           <path d="M12 19V5M5 12l7-7 7 7"/></svg>
       </button>
     </form>
-    <div class="label foot">Runs on this machine · every answer shows its SQL</div>
+    <div class="label foot" id="foot">Runs on this machine · every answer shows its SQL</div>
   </div>
 </div>
 </div>
@@ -394,6 +394,10 @@
 
   fetch("/api/meta").then(function (r) { return r.json(); }).then(function (m) {
     document.getElementById("scope").textContent = m.area + " · Overture " + m.release;
+    if (m.hosted) {
+      document.getElementById("foot").textContent = "Hosted open model · every answer shows its SQL" +
+        (m.limits ? " · " + m.limits.per_10_min + " questions per 10 minutes" : "");
+    }
     m.models.forEach(function (name) { modelSel.appendChild(el("option", "", name)); });
     // ?q=... asks on load, so a question can be bookmarked locally.
     const params = new URLSearchParams(location.search);

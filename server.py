@@ -11,7 +11,10 @@ results with coordinates are drawn on the map.
 from __future__ import annotations
 
 import argparse
+import collections
+import datetime
 import json
+import os
 import re
 import threading
 import time
@@ -24,14 +27,32 @@ import pandas as pd
 
 import kepler_view
 from data_loader import DataStore
-from llm import chat_ollama
+from llm import chat_ollama, chat_openai_compatible
 from run_evals import DATASET, load_store
 
 WEB = Path(__file__).parent / "web"
 STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
           "/index.html": ("index.html", "text/html; charset=utf-8"),
           "/kartograf-theme.js": ("kartograf-theme.js", "text/javascript; charset=utf-8")}
-MODELS = ("qwen3:8b", "llama3.1:8b")
+# Provider and limits come from the environment, so the same code runs on a laptop
+# (Ollama, no limits) and as a public demo (hosted open model, rate limits).
+#   KARTOGRAF_PROVIDER   ollama (default) | openai  (any OpenAI-compatible endpoint)
+#   KARTOGRAF_BASE_URL   e.g. https://router.huggingface.co/v1
+#   KARTOGRAF_API_KEY    key for that endpoint, never sent to the browser
+#   KARTOGRAF_MODELS     comma-separated, first is the default
+#   KARTOGRAF_EXTRA_BODY JSON merged into each request (provider options)
+#   KARTOGRAF_PUBLIC     1 = per-visitor rate limit and a daily cap
+#   KARTOGRAF_RATE       questions per visitor per 10 minutes (default 6)
+#   KARTOGRAF_DAILY      questions per day across all visitors (default 300)
+PROVIDER = os.environ.get("KARTOGRAF_PROVIDER", "ollama")
+BASE_URL = os.environ.get("KARTOGRAF_BASE_URL", "http://localhost:11434/v1")
+API_KEY = os.environ.get("KARTOGRAF_API_KEY", "")
+EXTRA_BODY = json.loads(os.environ.get("KARTOGRAF_EXTRA_BODY", "{}"))
+MODELS = tuple(m.strip() for m in os.environ.get("KARTOGRAF_MODELS", "qwen3:8b,llama3.1:8b").split(",") if m.strip())
+PUBLIC = os.environ.get("KARTOGRAF_PUBLIC", "0") == "1"
+RATE_PER_10_MIN = int(os.environ.get("KARTOGRAF_RATE", "6"))
+DAILY_CAP = int(os.environ.get("KARTOGRAF_DAILY", "300"))
+MAX_QUESTION_CHARS = 300 if PUBLIC else 500
 MAP_ROWS = 5_000
 CHART_MAX_BARS = 12
 
@@ -145,9 +166,46 @@ def base_layers(store: DataStore) -> list[dict]:
     return out
 
 
+class Limiter:
+    """Per-visitor sliding window plus a global daily cap. In memory: a restart resets it."""
+
+    def __init__(self, per_window: int, window_s: float, daily: int) -> None:
+        self.per_window, self.window_s, self.daily = per_window, window_s, daily
+        self.hits: dict[str, collections.deque] = collections.defaultdict(collections.deque)
+        self.day, self.count = datetime.date.today(), 0
+        self.lock = threading.Lock()
+
+    def check(self, visitor: str, now: float | None = None) -> str | None:
+        """None if allowed (and counted), else a message for the visitor."""
+        now = time.time() if now is None else now
+        with self.lock:
+            if datetime.date.today() != self.day:
+                self.day, self.count = datetime.date.today(), 0
+            if self.count >= self.daily:
+                return "The demo has reached today's question limit. It resets at midnight UTC."
+            q = self.hits[visitor]
+            while q and now - q[0] > self.window_s:
+                q.popleft()
+            if len(q) >= self.per_window:
+                return f"That is {self.per_window} questions in 10 minutes. Please wait a few minutes."
+            q.append(now)
+            self.count += 1
+            return None
+
+
+LIMITER = Limiter(RATE_PER_10_MIN, 600, DAILY_CAP)
+
+
+def run_model(store: DataStore, question: str, model: str):
+    if PROVIDER == "openai":
+        return chat_openai_compatible(store, [], question, model=model, base_url=BASE_URL, api_key=API_KEY,
+                                      extra_instructions=DATA_CONTEXT, extra_body=EXTRA_BODY)
+    return chat_ollama(store, [], question, model=model, extra_instructions=DATA_CONTEXT,
+                       think=False if model.startswith("qwen3") else None)
+
+
 def ask(store: DataStore, question: str, model: str) -> dict:
-    result, _ = chat_ollama(store, [], question, model=model, extra_instructions=DATA_CONTEXT,
-                            think=False if model.startswith("qwen3") else None)
+    result, _ = run_model(store, question, model)
     queries = [{"sql": q.sql, "purpose": q.purpose, "ok": q.ok, "rows": q.rows, "error": q.error,
                 "seconds": round(q.seconds, 2), "by": "model"} for q in result.queries]
     frames = [q.result for q in result.queries if q.ok]
@@ -223,17 +281,24 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
-            question = str(body.get("question", "")).strip()[:500]
+            question = str(body.get("question", "")).strip()[:MAX_QUESTION_CHARS]
             model = body.get("model") if body.get("model") in MODELS else MODELS[0]
         except (ValueError, TypeError):
             return self._json({"error": "bad request"}, HTTPStatus.BAD_REQUEST)
         if not question:
             return self._json({"error": "empty question"}, HTTPStatus.BAD_REQUEST)
+        if PUBLIC:
+            # Behind the hosting proxy the visitor is the first X-Forwarded-For entry.
+            visitor = (self.headers.get("X-Forwarded-For") or self.client_address[0]).split(",")[0].strip()
+            refusal = LIMITER.check(visitor)
+            if refusal:
+                return self._json({"error": refusal}, HTTPStatus.TOO_MANY_REQUESTS)
         try:
             with self.lock:
                 return self._json(ask(self.store, question, model))
         except Exception as e:
-            return self._json({"error": f"{type(e).__name__}: {e}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            detail = "the model service did not answer, please try again" if PUBLIC else f"{type(e).__name__}: {e}"
+            return self._json({"error": detail}, HTTPStatus.INTERNAL_SERVER_ERROR)
 
     def log_message(self, fmt, *args) -> None:
         print(f"[{time.strftime('%H:%M:%S')}] {self.command} {self.path.split('?')[0]}", flush=True)
@@ -241,7 +306,9 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--port", type=int, default=8766)
+    ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8766")))
+    ap.add_argument("--host", default=os.environ.get("KARTOGRAF_HOST", "127.0.0.1"),
+                    help="0.0.0.0 only inside a container or behind a proxy")
     args = ap.parse_args()
 
     store = load_store()
@@ -249,9 +316,11 @@ def main() -> int:
     Handler.layers_json = json.dumps(base_layers(store), ensure_ascii=False).encode()
     release = sorted(p.name[len("stats_"):-len(".csv")] for p in DATASET.glob("stats_*.csv"))[-1]
     Handler.meta = {"area": "Frankfurt am Main", "release": release, "models": list(MODELS),
-                    "tables": {n: t.feature_count for n, t in store.tables.items()}}
-    # Localhost only: the API runs model-written SQL against local data.
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+                    "tables": {n: t.feature_count for n, t in store.tables.items()},
+                    "hosted": PROVIDER == "openai", "public": PUBLIC,
+                    "limits": {"per_10_min": RATE_PER_10_MIN, "daily": DAILY_CAP} if PUBLIC else None}
+    # Default is localhost only: the API runs model-written SQL against local data.
+    server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"Kartograf on http://localhost:{args.port}  ({release}, models: {', '.join(MODELS)})", flush=True)
     try:
         server.serve_forever()

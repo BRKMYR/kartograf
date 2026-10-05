@@ -67,3 +67,20 @@ def test_bar_charts_are_tagged_with_their_table():
     tagged = server.chart_source(chart, ["SELECT class, SUM(length_km) AS km FROM roads GROUP BY class"])
     assert tagged["table"] == "roads"
     assert "table" not in server.chart_source({**chart, "label": "name"}, ["SELECT name FROM roads"])
+
+
+def test_limiter_per_visitor_window_and_daily_cap():
+    lim = server.Limiter(per_window=2, window_s=600, daily=3)
+    assert lim.check("a", now=0) is None and lim.check("a", now=1) is None
+    assert "2 questions" in lim.check("a", now=2)          # third in the window is refused
+    assert lim.check("b", now=3) is None                   # other visitors are independent
+    lim2 = server.Limiter(per_window=10, window_s=600, daily=2)
+    assert lim2.check("x", now=0) is None and lim2.check("y", now=1) is None
+    assert "today's question limit" in lim2.check("z", now=2)
+
+
+def test_limiter_frees_a_visitor_after_the_window():
+    lim = server.Limiter(per_window=1, window_s=600, daily=100)
+    assert lim.check("a", now=0) is None
+    assert lim.check("a", now=10) is not None
+    assert lim.check("a", now=601) is None

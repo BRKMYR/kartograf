@@ -253,3 +253,80 @@ def chat_ollama(
     )
     # Drop the system message; it is rebuilt each turn from the current schema.
     return result, messages[1:]
+
+
+# --------------------------------------------------------------------------- OpenAI-compatible
+
+def chat_openai_compatible(
+    store: DataStore,
+    history: list[dict[str, Any]],
+    user_message: str,
+    model: str,
+    base_url: str,
+    api_key: str = "",
+    on_status: Callable[[str], None] | None = None,
+    extra_instructions: str = "",
+    extra_body: dict[str, Any] | None = None,
+    timeout: float = 60.0,
+) -> tuple[ChatResult, list[dict[str, Any]]]:
+    """Same loop against any OpenAI-compatible chat completions endpoint.
+
+    Covers hosted open models (Hugging Face Inference Providers, Groq, vLLM) and
+    Ollama's own /v1 endpoint, with the standard library only. extra_body is
+    merged into each request, for provider options such as disabling reasoning.
+    """
+    import urllib.error
+    import urllib.request
+
+    url = base_url.rstrip("/") + "/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    messages = [{"role": "system", "content": build_system_prompt(store, extra_instructions)}] \
+        + list(history) + [{"role": "user", "content": user_message}]
+    records: list[QueryRecord] = []
+    t0 = time.perf_counter()
+    in_tok = out_tok = 0
+    answer = ""
+
+    for _ in range(MAX_TOOL_ROUNDS + 1):
+        if on_status:
+            on_status("Thinking (hosted model)...")
+        body = {"model": model, "messages": messages, "tools": [_ollama_tool_spec()],
+                "tool_choice": "auto", "temperature": 0, **(extra_body or {})}
+        req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read())
+        except urllib.error.HTTPError as e:  # surface the provider's message, not a bare status
+            raise RuntimeError(f"model endpoint returned {e.code}: {e.read()[:300].decode(errors='replace')}") from e
+        usage = data.get("usage") or {}
+        in_tok += usage.get("prompt_tokens") or 0
+        out_tok += usage.get("completion_tokens") or 0
+        msg = data["choices"][0]["message"]
+        calls = msg.get("tool_calls") or []
+        messages.append({"role": "assistant", "content": msg.get("content") or "", **({"tool_calls": calls} if calls else {})})
+        if not calls:
+            answer = (msg.get("content") or "").strip()
+            break
+        for call in calls:
+            raw = call.get("function", {}).get("arguments") or "{}"
+            try:
+                args = json.loads(raw) if isinstance(raw, str) else raw
+            except json.JSONDecodeError:
+                args = {"sql": raw, "purpose": ""}
+            if on_status:
+                on_status(f"Running SQL: {args.get('purpose', '')}")
+            text, _ = execute_run_sql(store, args, records)
+            messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": text})
+    else:
+        answer = "Stopped after too many query rounds without a final answer."
+
+    # Reasoning models may emit <think> blocks in content; the answer is what follows.
+    if "</think>" in answer:
+        answer = answer.split("</think>", 1)[1].strip()
+    result = ChatResult(
+        answer=answer or "(empty answer)", queries=records, provider="openai-compatible", model=model,
+        seconds=time.perf_counter() - t0, input_tokens=in_tok or None, output_tokens=out_tok or None,
+    )
+    return result, messages[1:]

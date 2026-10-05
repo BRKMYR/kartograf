@@ -222,3 +222,11 @@ def test_is_named_default_is_restored():
     ]}
     t = load_file("roads.geojson", json.dumps(fc).encode())
     assert t.df.set_index("feature_id")["is_named"].to_dict() == {"a": True, "b": False}
+
+
+def test_runaway_query_is_interrupted():
+    s = DataStore()
+    s.con.execute("CREATE TABLE big AS SELECT range AS i FROM range(4000000)")
+    with pytest.raises(TimeoutError):
+        s.run_sql("SELECT count(*) FROM big a, big b WHERE a.i + b.i = -1", timeout=0.5)
+    assert s.run_sql("SELECT 1 AS ok").iloc[0, 0] == 1     # the connection still works afterwards
