@@ -21,6 +21,7 @@ PRESETS: dict[str, dict] = {
     "berlin-brandenburg": {"label": "Berlin-Brandenburg",  "bbox": (11.26, 51.36, 14.77, 53.56)},
     "berlin":             {"label": "Berlin",              "bbox": (13.08, 52.33, 13.77, 52.68)},
     "saarland":           {"label": "Saarland",            "bbox": (6.35, 49.11, 7.40, 49.64)},
+    "frankfurt":          {"label": "Frankfurt am Main",   "bbox": (8.47, 50.02, 8.80, 50.23)},
 }
 
 EXCLUDED_DIRS = {"archive"}
@@ -74,3 +75,23 @@ def roads_path(directory: Path, release: str) -> Path | None:
 def read_bytes_maybe_gzip(path: Path) -> bytes:
     raw = path.read_bytes()
     return gzip.decompress(raw) if raw[:2] == b"\x1f\x8b" else raw
+
+
+def latest_release_files(directory: Path) -> dict[str, Path]:
+    """The newest release in a folder, keyed by the short table name it loads as.
+
+    Short names (roads, places, road_stats) are easier for a small local model
+    to write correctly than release-stamped ones.
+    """
+    releases = sorted(p.name[len("stats_"):-len(".csv")] for p in directory.glob("stats_*.csv")
+                      if p.stat().st_size > 0)
+    if not releases:
+        return {}
+    rel = releases[-1]
+    out = {"road_stats": directory / f"stats_{rel}.csv"}
+    if (roads := roads_path(directory, rel)) is not None:
+        out["roads"] = roads
+    places = directory / f"places_{rel}.geojson.gz"
+    if places.exists() and places.stat().st_size > 0:
+        out["places"] = places
+    return out

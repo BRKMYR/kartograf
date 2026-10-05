@@ -31,7 +31,18 @@ Rules:
 - Results are truncated to {max_rows} rows; aggregate rather than dump rows.
 - Point columns lon/lat are WGS84 degrees. For distances without the spatial
   extension, use the haversine formula in SQL.
+- If a query fails, read the error, fix the SQL and call run_sql again. Do not
+  explain the error to the user instead of answering.
 - If the question cannot be answered from these tables, say so plainly.
+
+Spatial recipes (lon/lat are WGS84 degrees; distances must be in metres):
+- Distance in metres between a row and a point:
+  ST_Distance_Sphere(ST_Point(lon, lat), ST_Point(<lon>, <lat>))
+- Rows within 1 km of a point:
+  WHERE ST_Distance_Sphere(ST_Point(lon, lat), ST_Point(8.6625, 50.1070)) <= 1000
+- Never use ST_Distance on lon/lat (that returns degrees). Never use ST_MakePoint.
+- Category matching: compare with = on the exact category value; look up values
+  with SELECT DISTINCT category ... WHERE category ILIKE '%term%' when unsure.
 - Final answer: state the number(s), name the table(s) used, and mention any
   assumption. Keep it short. Do not repeat the SQL in the answer; the UI shows it.
 
@@ -186,7 +197,7 @@ def chat_ollama(
     store: DataStore,
     history: list[dict[str, Any]],
     user_message: str,
-    model: str = "qwen3:8b",
+    model: str = "llama3.1:8b",
     host: str | None = None,
     on_status: Callable[[str], None] | None = None,
 ) -> tuple[ChatResult, list[dict[str, Any]]]:

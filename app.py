@@ -130,7 +130,7 @@ with st.sidebar:
     st.caption("CSV and GeoJSON in, questions in plain language, SQL you can audit.")
 
     st.subheader("Model")
-    provider = st.radio("Provider", ["Claude (Anthropic API)", "Local (Ollama)"],
+    provider = st.radio("Provider", ["Claude (Anthropic API)", "Local (Ollama)"], index=1,
                         help="Local keeps every byte on this machine. Claude sends schema, sample rows and query results to the API.")
     if provider.startswith("Claude"):
         model = st.text_input("Model", value="claude-opus-5")
@@ -140,7 +140,7 @@ with st.sidebar:
             st.info("Set ANTHROPIC_API_KEY in the environment (or log in with the ant CLI) before asking questions.")
         ollama_host = None
     else:
-        model = st.text_input("Ollama model", value="qwen3:8b", help="Must support tool calling, e.g. qwen3, llama3.1, mistral-nemo.")
+        model = st.text_input("Ollama model", value="llama3.1:8b", help="Must support tool calling, e.g. llama3.1, qwen3, mistral-nemo.")
         ollama_host = st.text_input("Ollama host", value="http://localhost:11434")
         effort = None
 
@@ -161,6 +161,11 @@ with st.sidebar:
             for p in files:
                 if p.stat().st_size > 0:
                     add_file(f"{dataset_dir.name}_{p.name}", p.read_bytes())
+        latest = scopes.latest_release_files(dataset_dir)
+        if "places" in latest and st.button(f"Load latest release as roads + places ({scopes.label(dataset_dir.name)})"):
+            for table_name, p in latest.items():
+                suffix = ".csv" if p.suffix == ".csv" else ".geojson.gz"
+                add_file(f"{table_name}{suffix}", p.read_bytes())
         size_mb = sum(p.stat().st_size for p in dataset_dir.glob("*")) / 1e6
         st.caption(f"{len(files)} file(s), {size_mb:.1f} MB on disk")
 
@@ -182,6 +187,7 @@ with st.sidebar:
     st.divider()
     st.caption("**Data sources**")
     st.caption(attribution.DATA_ATTRIBUTION)
+    st.caption(attribution.PLACES_ATTRIBUTION)
     st.caption(attribution.NOT_AFFILIATED)
     st.caption(attribution.SAMPLE_DATA_NOTE)
 

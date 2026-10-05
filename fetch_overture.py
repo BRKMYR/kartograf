@@ -4,6 +4,7 @@ Per release, into data/overture/<scope>/:
   stats_<release>.csv           km, segments, mean length, name coverage by state and class
   roads_<release>.geojson.gz    motorway + trunk geometry for the map, gzip-compressed
   scope_<release>.json          exactly what was fetched; the app only compares equal scopes
+  places_<release>.geojson.gz   points of interest with name and category (only with --places)
 
 How the transfer is kept small:
   * One pass per release. Geometry is ~93% of the bytes and is read exactly once;
@@ -20,6 +21,7 @@ Usage:
   python fetch_overture.py --preset berlin
   python fetch_overture.py --preset germany --releases 2026-07-22.0 2026-08-19.0
   python fetch_overture.py --bbox 6.35 49.11 7.40 49.64
+  python fetch_overture.py --preset frankfurt --releases 2026-09-23.1 --places --map-classes motorway trunk primary secondary tertiary
   python fetch_overture.py --compact     # rewrite existing uncompressed map files in place
 
 Data: © OpenStreetMap contributors, Overture Maps Foundation. Available under the
@@ -55,6 +57,9 @@ COORD_DECIMALS = 5       # ~1 m
 # Leaf columns the single pass touches. Used both by the query and by --estimate.
 SEGMENT_COLUMNS = ("subtype", "class", "bbox, xmin", "bbox, ymin", "names, primary", "id", "geometry")
 DIVISION_COLUMNS = ("country", "subtype", "names, primary", "geometry")
+PLACE_COLUMNS = ("bbox, xmin", "bbox, ymin", "id", "names, primary", "basic_category",
+                 "taxonomy, primary", "confidence", "operating_status", "addresses, list, element, locality",
+                 "geometry")
 
 
 def log(msg: str) -> None:
@@ -79,6 +84,10 @@ def division_glob(release: str) -> str:
     return f"{BUCKET}/{release}/theme=divisions/type=division_area/*"
 
 
+def place_glob(release: str) -> str:
+    return f"{BUCKET}/{release}/theme=places/type=place/*"
+
+
 # --------------------------------------------------------------------- estimate
 
 def overlapping_bytes(meta: pd.DataFrame, bbox, columns) -> tuple[int, int, int]:
@@ -101,21 +110,23 @@ def overlapping_bytes(meta: pd.DataFrame, bbox, columns) -> tuple[int, int, int]
     return len(keep), total_groups, int(sel["total_compressed_size"].sum())
 
 
-def read_metadata(con, release: str) -> pd.DataFrame:
+def read_metadata(con, release: str, kind: str = "segments") -> pd.DataFrame:
     """Footer statistics for the columns the pipeline reads, cached locally.
 
     Only the needed leaf columns are pulled into pandas; converting every
     column of every row group is what makes an unfiltered read take minutes.
     The cache is a few MB and makes later estimates for any region instant.
     """
-    cache = DATA_ROOT / ".meta" / f"segments_{release}.parquet"
+    glob, columns = {"segments": (segment_glob(release), SEGMENT_COLUMNS),
+                     "places": (place_glob(release), PLACE_COLUMNS)}[kind]
+    cache = DATA_ROOT / ".meta" / f"{kind}_{release}.parquet"
     if cache.exists():
         return pd.read_parquet(cache)
-    cols = ", ".join(f"'{c}'" for c in SEGMENT_COLUMNS)
+    cols = ", ".join(f"'{c}'" for c in columns)
     meta = con.execute(f"""
         SELECT file_name, row_group_id, path_in_schema, total_compressed_size,
                TRY_CAST(stats_min AS DOUBLE) AS mn, TRY_CAST(stats_max AS DOUBLE) AS mx
-        FROM parquet_metadata('{segment_glob(release)}')
+        FROM parquet_metadata('{glob}')
         WHERE path_in_schema IN ({cols})
     """).fetchdf()
     cache.parent.mkdir(parents=True, exist_ok=True)
@@ -140,6 +151,12 @@ def estimate(con, release: str, bbox) -> int:
         extra = f" + ~{dmeta / 1e9:.2f} GB once for state boundaries (then cached)"
     log(f"  estimate {release}: {groups:,} of {total:,} row groups, "
         f"~{nbytes / 1e9:.2f} GB{extra}  (footers read in {time.time() - t0:.0f}s)")
+    return nbytes
+
+
+def estimate_places(con, release: str, bbox) -> int:
+    groups, total, nbytes = overlapping_bytes(read_metadata(con, release, "places"), bbox, PLACE_COLUMNS)
+    log(f"  estimate places {release}: {groups:,} of {total:,} row groups, ~{nbytes / 1e9:.2f} GB")
     return nbytes
 
 
@@ -168,11 +185,11 @@ def load_states(con, release: str) -> None:
     log(f"  states: {n} ({src})")
 
 
-def single_pass(con, release: str, bbox, classes) -> None:
+def single_pass(con, release: str, bbox, classes, map_classes=MAP_CLASSES) -> None:
     """Read the release once. Everything later is local."""
     x0, y0, x1, y1 = bbox
     cls = ", ".join(f"'{c}'" for c in classes)
-    mapc = ", ".join(f"'{c}'" for c in MAP_CLASSES)
+    mapc = ", ".join(f"'{c}'" for c in map_classes)
     t0 = time.time()
     con.execute(f"""
         CREATE OR REPLACE TEMP TABLE seg AS
@@ -277,6 +294,43 @@ def write_map(con, release: str, out: Path) -> None:
     log(f"  map: {path.name}, {n:,} features, {path.stat().st_size / 1e6:.1f} MB")
 
 
+def place_feature(fid: str, name: str | None, category: str | None, basic: str | None,
+                  confidence: float | None, status: str | None, locality: str | None,
+                  lon: float, lat: float) -> dict:
+    """One place as a slim GeoJSON point. Empty fields are omitted."""
+    props = {"category": category, "basic_category": basic, "name": name, "locality": locality,
+             "operating_status": status,
+             "confidence": round(float(confidence), 3) if confidence is not None else None}
+    return {"type": "Feature", "id": fid, "properties": {k: v for k, v in props.items() if v is not None},
+            "geometry": {"type": "Point", "coordinates": round_coords([lon, lat])}}
+
+
+def write_places(con, release: str, bbox, out: Path) -> None:
+    """Points of interest inside the bbox, read in one pass with the same row-group pruning."""
+    x0, y0, x1, y1 = bbox
+    path = out / f"places_{release}.geojson.gz"
+    t0 = time.time()
+    cur = con.execute(f"""
+        SELECT id, names.primary, taxonomy.primary, basic_category, confidence, operating_status,
+               addresses[1].locality, ST_X(geometry), ST_Y(geometry)
+        FROM read_parquet('{place_glob(release)}', hive_partitioning=1)
+        WHERE bbox.xmin BETWEEN {x0} AND {x1}
+          AND bbox.ymin BETWEEN {y0} AND {y1}
+    """)
+
+    def rows():
+        while True:
+            batch = cur.fetchmany(5000)
+            if not batch:
+                return
+            for row in batch:
+                yield place_feature(*row)
+
+    n = write_features_gz(path, rows())
+    log(f"  places: {path.name}, {n:,} features, {path.stat().st_size / 1e6:.1f} MB "
+        f"in {(time.time() - t0) / 60:.1f} min")
+
+
 def write_scope(release: str, bbox, classes, out: Path) -> None:
     (out / f"scope_{release}.json").write_text(json.dumps({
         "release": release,
@@ -341,6 +395,9 @@ def main() -> int:
     ap.add_argument("--bbox", nargs=4, type=float, metavar=("XMIN", "YMIN", "XMAX", "YMAX"),
                     help="custom area; overrides --preset")
     ap.add_argument("--classes", nargs="+", default=list(CLASSIFIED))
+    ap.add_argument("--map-classes", nargs="+", default=list(MAP_CLASSES),
+                    help="road classes written as map geometry (default: motorway trunk)")
+    ap.add_argument("--places", action="store_true", help="also fetch points of interest (places theme)")
     ap.add_argument("--estimate", action="store_true", help="print expected transfer and exit")
     ap.add_argument("--compact", action="store_true", help="compress existing map files and exit")
     args = ap.parse_args()
@@ -359,6 +416,8 @@ def main() -> int:
     try:
         if args.estimate:
             total = sum(estimate(con, r, bbox) for r in args.releases)
+            if args.places:
+                total += sum(estimate_places(con, r, bbox) for r in args.releases)
             log(f"total for {len(args.releases)} release(s): ~{total / 1e9:.2f} GB")
             return 0
         out.mkdir(parents=True, exist_ok=True)
@@ -366,10 +425,12 @@ def main() -> int:
         for release in args.releases:
             log(f"release {release}")
             load_states(con, release)
-            single_pass(con, release, bbox, classes)
+            single_pass(con, release, bbox, classes, tuple(args.map_classes))
             write_stats(con, release, out)
             write_map(con, release, out)
             write_scope(release, bbox, classes, out)
+            if args.places:
+                write_places(con, release, bbox, out)
             con.execute("DROP TABLE IF EXISTS seg; DROP TABLE IF EXISTS cell_state;")
         log(f"done in {(time.time() - t0) / 60:.1f} min -> {out}")
         return 0

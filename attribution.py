@@ -20,6 +20,11 @@ SOURCE_DETAIL = (
     "Its divisions theme also draws on geoBoundaries, Esri Community Maps and LINZ (CC BY 4.0)."
 )
 
+PLACES_ATTRIBUTION = (
+    "Places data from Overture Maps Foundation, combining sources under CDLA Permissive 2.0 "
+    "(Meta, Microsoft and others), Apache 2.0 (Foursquare Labs, Inc.) and CC0 1.0 (AllThePlaces)."
+)
+
 BASEMAP_ATTRIBUTION = "Basemap © CARTO, © OpenStreetMap contributors."
 
 NOT_AFFILIATED = (

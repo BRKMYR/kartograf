@@ -271,7 +271,7 @@ class DataStore:
                 f"Columns: {col_lines}\nSample rows (CSV):\n{sample}"
             )
         spatial = ("DuckDB spatial extension is loaded: ST_GeomFromGeoJSON(geometry_geojson), "
-                   "ST_Area, ST_Distance, ST_Within etc. are available."
+                   "ST_Area, ST_Within, ST_Point and ST_Distance_Sphere (metres) etc. are available."
                    if self.spatial else "DuckDB spatial extension is NOT available; use lon/lat and bbox columns.")
         return "\n\n".join(parts) + "\n\n" + spatial
 
