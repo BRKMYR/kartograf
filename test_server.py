@@ -50,3 +50,20 @@ def test_pick_chart_ignores_coordinates_and_caps_bars():
     chart = server.pick_chart([df])
     assert chart["value"] == "n" and len(chart["rows"]) == server.CHART_MAX_BARS
     assert chart["rows"][0]["value"] == 29
+
+
+def test_highlight_only_whitelisted_columns_and_bound_values():
+    from data_loader import DataStore
+    store = DataStore()
+    store.con.execute("CREATE TABLE roads AS SELECT * FROM (VALUES ('motorway', 8.6, 50.1), ('trunk', 8.7, 50.2)) t(class, lon, lat)")
+    layer = server.highlight_layer(store, "roads", "class", "motorway")
+    assert layer["rows"] == 1 and layer["id"] == "highlight"
+    assert server.highlight_layer(store, "roads", "lon", "8.6") is None            # not whitelisted
+    assert server.highlight_layer(store, "roads", "class", "x' OR '1'='1") is None  # bound, matches nothing
+
+
+def test_bar_charts_are_tagged_with_their_table():
+    chart = {"type": "bar", "label": "class", "value": "km", "rows": []}
+    tagged = server.chart_source(chart, ["SELECT class, SUM(length_km) AS km FROM roads GROUP BY class"])
+    assert tagged["table"] == "roads"
+    assert "table" not in server.chart_source({**chart, "label": "name"}, ["SELECT name FROM roads"])

@@ -22,64 +22,99 @@
     --mute: #8a8a80; --rule: #d7d7cd;
     --sans: "Inter Tight", "Helvetica Neue", Arial, sans-serif;
     --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-    --track: 0.16em; --label: 0.68rem;
-    --side: 440px; --head: 56px;
+    --track: 0.16em; --label: 0.68rem; --head: 56px; --dock: 760px;
+    --shadow: 0 1px 2px rgba(23, 23, 18, 0.06), 0 8px 28px rgba(23, 23, 18, 0.12);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--sans); overflow: hidden; }
-  /* The grid lives on its own element: kepler and maplibre append portals to <body>,
-     which would otherwise become extra grid rows and shorten the map. */
-  .app { display: grid; grid-template-rows: var(--head) minmax(0, 1fr); grid-template-columns: minmax(0, 1fr) var(--side);
-         height: 100vh; }
+  /* The grid lives on its own element: kepler and maplibre append portals to <body>. */
+  .app { display: grid; grid-template-rows: var(--head) minmax(0, 1fr); height: 100vh; }
 
-  header { grid-column: 1 / 3; display: flex; align-items: center; gap: 20px; padding: 0 22px;
-           border-bottom: 1px solid var(--rule); background: var(--bg); }
+  header { display: flex; align-items: center; gap: 20px; padding: 0 22px;
+           border-bottom: 1px solid var(--rule); background: var(--bg); position: relative; z-index: 2; }
   .brand { font-weight: 600; font-size: 1.35rem; letter-spacing: -0.01em; }
   .label { font-family: var(--mono); font-size: var(--label); letter-spacing: var(--track);
            text-transform: uppercase; color: var(--sec); }
   header .spacer { flex: 1; }
-  header select { font-family: var(--mono); font-size: var(--label); letter-spacing: 0.08em; color: var(--ink);
-                  background: var(--paper); border: 1px solid var(--rule); padding: 6px 8px; }
+  .kbd { font-family: var(--mono); font-size: 0.62rem; color: var(--sec); border: 1px solid var(--rule);
+         padding: 1px 5px; margin: 0 4px; background: var(--paper); }
 
-  #map { position: relative; min-width: 0; min-height: 0; }
+  .stage { position: relative; min-height: 0; }
+  #map { position: absolute; inset: 0; }
   #map .maplibregl-canvas { filter: sepia(0.16) saturate(0.7); }  /* warm the Positron basemap */
 
-  aside { border-left: 1px solid var(--rule); display: flex; flex-direction: column; min-height: 0; background: var(--bg); }
-  form { padding: 18px 20px 12px; border-bottom: 1px solid var(--rule); }
-  .search { display: flex; gap: 8px; }
-  .search input { flex: 1; min-width: 0; font: 400 0.98rem var(--sans); color: var(--ink); background: var(--paper);
-                  border: 1px solid var(--rule); padding: 11px 12px; outline: none; }
-  .search input:focus { border-color: var(--ink); }
-  .search button { font: 500 0.92rem var(--sans); color: var(--bg); background: var(--ink); border: 0; padding: 0 16px; cursor: pointer; }
-  .search button:disabled { background: var(--mute); cursor: wait; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .chips button { font: 400 0.78rem var(--sans); color: var(--sec); background: transparent; border: 1px solid var(--rule);
-                  padding: 5px 8px; cursor: pointer; text-align: left; }
-  .chips button:hover { color: var(--ink); border-color: var(--sec); }
+  /* ------------------------------------------------------------ dock */
+  .dock { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+          width: min(var(--dock), calc(100% - 32px)); z-index: 5; display: flex; flex-direction: column; gap: 10px;
+          pointer-events: none; }
+  .dock > * { pointer-events: auto; }
 
-  #results { overflow-y: auto; padding: 4px 20px 24px; flex: 1; }
-  .card { padding: 16px 0 18px; border-bottom: 1px solid var(--rule); }
-  .q { font-weight: 600; font-size: 0.98rem; margin: 0 0 8px; }
+  .thread { background: var(--bg); border: 1px solid var(--rule); box-shadow: var(--shadow);
+            max-height: 56vh; display: flex; flex-direction: column; }
+  .thread[hidden] { display: none; }
+  .thread.collapsed .turns { display: none; }
+  .thread-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 18px; border-bottom: 1px solid var(--rule); }
+  .thread.collapsed .thread-bar { border-bottom: 0; }
+  .thread-bar .spacer { flex: 1; }
+  .icon-btn { font: 500 0.8rem var(--sans); color: var(--sec); background: transparent; border: 0; cursor: pointer; padding: 4px 8px; }
+  .icon-btn:hover { color: var(--ink); }
+  .turns { overflow-y: auto; padding: 0 18px; }
+
+  .turn { padding: 16px 0 18px; border-bottom: 1px solid var(--rule); animation: rise 0.25s ease; }
+  .turn:last-child { border-bottom: 0; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .q { font-weight: 600; font-size: 1rem; margin: 0 0 8px; }
+  .a { font-size: 0.96rem; line-height: 1.5; color: #1d1d1d; white-space: pre-wrap; margin: 0; }
   .a strong { font-weight: 600; color: var(--ink); }
-  .a { font-size: 0.95rem; line-height: 1.45; color: #1d1d1d; white-space: pre-wrap; margin: 0; }
-  .meta { margin-top: 10px; }
-  .status { color: var(--sec); font-size: 0.9rem; }
-  .status::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1.2s steps(4) infinite; }
-  @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+  .a code { font-family: var(--mono); font-size: 0.8em; background: var(--paper); border: 1px solid var(--rule); padding: 0 4px; }
+  .meta { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .thinking { color: var(--sec); font-size: 0.92rem; display: flex; align-items: center; gap: 10px; }
+  .pulse { width: 8px; height: 8px; background: var(--ink); border-radius: 50%; animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 0.25; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
   .error { color: #8a1c1c; }
 
   .chart { margin-top: 14px; }
-  .chart .label { display: block; margin-bottom: 8px; }
-  .big { font-weight: 600; font-size: 2.4rem; letter-spacing: -0.02em; line-height: 1; }
-  svg text { font-family: var(--sans); }
+  .chart > .label { display: block; margin-bottom: 8px; }
+  .chart .hint { text-transform: none; letter-spacing: 0.02em; color: var(--mute); margin-left: 10px; }
+  .big { font-weight: 600; font-size: 2.6rem; letter-spacing: -0.02em; line-height: 1; }
+  .bars { display: grid; grid-template-columns: minmax(90px, 190px) 1fr; gap: 4px 12px; align-items: center; }
+  .bar-row { display: contents; }
+  .bar-label { font-size: 0.84rem; color: var(--sec); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { display: flex; align-items: center; gap: 8px; min-width: 0; height: 22px; }
+  .bar-fill { height: 14px; background: var(--sec); width: 0; transition: background 0.15s ease, width 0.45s ease; }
+  .bar-value { font-family: var(--mono); font-size: 0.72rem; color: var(--ink); white-space: nowrap; }
+  .bars.clickable .bar-label, .bars.clickable .bar-track { cursor: pointer; }
+  .bars .bar-row:hover .bar-fill, .bars .bar-row.on .bar-fill { background: var(--ink); }
+  .bars .bar-row:hover .bar-label, .bars .bar-row.on .bar-label { color: var(--ink); }
 
-  details { margin-top: 12px; }
   summary { cursor: pointer; list-style: none; }
   summary::-webkit-details-marker { display: none; }
   pre { font-family: var(--mono); font-size: 0.72rem; line-height: 1.5; background: var(--paper); border: 1px solid var(--rule);
         padding: 10px; margin: 8px 0 0; white-space: pre-wrap; word-break: break-word; color: var(--ink); }
   pre.failed { color: var(--mute); }
-  .empty { color: var(--sec); font-size: 0.9rem; line-height: 1.5; padding-top: 16px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chips[hidden] { display: none; }
+  .chips button { font: 400 0.86rem var(--sans); color: var(--ink); background: var(--bg); border: 1px solid var(--rule);
+                  border-radius: 999px; padding: 7px 14px; cursor: pointer; box-shadow: var(--shadow);
+                  transition: border-color 0.15s ease, transform 0.15s ease; }
+  .chips button:hover { border-color: var(--sec); transform: translateY(-1px); }
+
+  .composer { display: flex; align-items: center; gap: 8px; background: var(--paper); border: 1px solid var(--rule);
+              border-radius: 999px; padding: 6px 6px 6px 22px; box-shadow: var(--shadow);
+              transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+  .composer:focus-within { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(23, 23, 18, 0.08), var(--shadow); }
+  .composer input { flex: 1; min-width: 0; font: 400 1.05rem var(--sans); color: var(--ink); background: transparent;
+                    border: 0; outline: none; padding: 12px 0; }
+  .composer input::placeholder { color: var(--mute); }
+  .composer select { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.08em; color: var(--sec);
+                     background: transparent; border: 0; border-left: 1px solid var(--rule); padding: 6px 8px; cursor: pointer; }
+  .send { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--ink); color: var(--bg);
+          display: grid; place-items: center; cursor: pointer; flex: none; transition: transform 0.15s ease, background 0.15s ease; }
+  .send:hover { transform: scale(1.05); }
+  .send:disabled { background: var(--mute); cursor: wait; transform: none; }
+  .send svg { width: 18px; height: 18px; }
+  .foot { text-align: center; color: var(--mute); }
 </style>
 </head>
 <body>
@@ -88,51 +123,70 @@
   <span class="brand">Kartograf</span>
   <span class="label" id="scope">Frankfurt am Main</span>
   <span class="spacer"></span>
-  <span class="label">Local model</span>
-  <select id="model" aria-label="Model"></select>
+  <span class="label">Press <span class="kbd">/</span> to ask</span>
 </header>
 
-<div id="map"></div>
+<div class="stage">
+  <div id="map"></div>
 
-<aside>
-  <form id="ask">
-    <div class="search">
-      <input id="question" autocomplete="off" placeholder="Ask about Frankfurt, in German or English" />
-      <button id="go" type="submit">Ask</button>
-    </div>
+  <div class="dock">
+    <section class="thread" id="thread" hidden>
+      <div class="thread-bar">
+        <span class="label" id="thread-title">Answers</span>
+        <span class="spacer"></span>
+        <button class="icon-btn" id="collapse" type="button">Hide</button>
+        <button class="icon-btn" id="clear" type="button">Clear</button>
+      </div>
+      <div class="turns" id="turns"></div>
+    </section>
+
     <div class="chips" id="chips"></div>
-  </form>
-  <div id="results">
-    <p class="empty">Ask a question. The local model writes SQL over Overture roads and places,
-      runs it, and answers with the numbers, a chart and the SQL it used. Places it finds
-      are drawn on the map.</p>
+
+    <form class="composer" id="ask" autocomplete="off">
+      <input id="question" placeholder="Ask about Frankfurt's roads and places" aria-label="Question" />
+      <select id="model" aria-label="Model"></select>
+      <button class="send" id="go" type="submit" aria-label="Ask">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      </button>
+    </form>
+    <div class="label foot">Runs on this machine · every answer shows its SQL</div>
   </div>
-</aside>
+</div>
 </div>
 
 <script>
   const EXAMPLES = [
-    "Wie viele Straßenkilometer hat Frankfurt?",
+    "How many kilometres of road does Frankfurt have?",
     "Which road class has the largest total length?",
-    "Apotheken im Umkreis von 1 km um den Hauptbahnhof (lon 8.6625, lat 50.1070)",
-    "Most common place categories within 500 m of the Hauptwache (lon 8.6791, lat 50.1137)"
+    "How many pharmacies are within 1 km of the main station (lon 8.6625, lat 50.1070)?",
+    "How many restaurants are within 500 m of the Hauptwache (lon 8.6791, lat 50.1137)?",
+    "How many places are permanently closed?"
   ];
-  const fmt = new Intl.NumberFormat(navigator.language || "de-DE", {maximumFractionDigits: 2});
+  const fmt = new Intl.NumberFormat("en-GB", {maximumFractionDigits: 2});
   const el = function (tag, cls, text) {
     const n = document.createElement(tag);
     if (cls) n.className = cls;
     if (text !== undefined) n.textContent = text;   // textContent only: model output is never parsed as HTML
     return n;
   };
-
-  // Minimal, safe Markdown: **bold** only, built from text nodes, never innerHTML.
+  // Minimal, safe Markdown: **bold** and `code` only, built from text nodes.
   function richText(tag, cls, text) {
     const n = el(tag, cls);
     String(text).replace(/^#+\s*/gm, "").split("**").forEach(function (part, i) {
-      n.appendChild(i % 2 ? el("strong", "", part) : document.createTextNode(part));
+      const host = i % 2 ? n.appendChild(el("strong")) : n;
+      part.split("`").forEach(function (bit, j) {
+        host.appendChild(j % 2 ? el("code", "", bit) : document.createTextNode(bit));
+      });
     });
     return n;
   }
+  const pretty = function (name) {
+    const n = String(name).toLowerCase();
+    if (/^count(_star)?\(.*\)$/.test(n)) return "count";
+    if (n.indexOf("length_km") >= 0) return "km";
+    return String(name).replace(/_/g, " ");
+  };
 
   /* ------------------------------------------------------------------ map */
   const reducers = Redux.combineReducers({keplerGl: KeplerGl.keplerGlReducer});
@@ -166,47 +220,42 @@
   }
   ReactDOM.createRoot(mapBox).render(React.createElement(ReactRedux.Provider, {store: store}, React.createElement(MapApp)));
 
-  function showAnswerOnMap(layer) {
-    const present = (store.getState().keplerGl.map || {}).visState;
-    if (present && present.datasets && present.datasets.answer) store.dispatch(KeplerGl.removeDataset("answer"));
+  // One overlay slot per kind: "answer" (places the model found) and "highlight" (a clicked bar).
+  function overlay(id, layer) {
+    const vis = (store.getState().keplerGl.map || {}).visState;
+    if (vis && vis.datasets && vis.datasets[id]) store.dispatch(KeplerGl.removeDataset(id));
     if (!layer) return;
+    layer.id = id;
     const ds = toKepler(layer);
     store.dispatch(KeplerGl.addDataToMap({
       datasets: [ds],
       options: {centerMap: false, keepExistingConfig: true, autoCreateLayers: false},
       config: {version: "v1", config: {visState: {layers: [Kartograf.layer(layer, true)]}}}
     }));
-    // Fly to the answer. Padded, so a single place does not zoom to street level.
-    const names = ds.data.fields.map(function (f) { return f.name; });
-    const iLon = names.indexOf("lon"), iLat = names.indexOf("lat");
-    if (iLon < 0 || iLat < 0 || !KeplerGl.fitBounds) return;
-    const lons = [], lats = [];
-    ds.data.rows.forEach(function (r) {
-      if (typeof r[iLon] === "number" && typeof r[iLat] === "number") { lons.push(r[iLon]); lats.push(r[iLat]); }
+    flyTo(ds.data);
+  }
+
+  // Fit the map to points or GeoJSON lines. Padded, so one place does not zoom to street level.
+  function flyTo(data) {
+    if (!KeplerGl.fitBounds) return;
+    const names = data.fields.map(function (f) { return f.name; });
+    const iLon = names.indexOf("lon"), iLat = names.indexOf("lat"), iGeo = names.indexOf("_geojson");
+    let x0 = 180, y0 = 90, x1 = -180, y1 = -90;
+    const add = function (x, y) { if (typeof x === "number" && typeof y === "number") {
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } };
+    const walk = function (c) { if (typeof c[0] === "number") add(c[0], c[1]); else c.forEach(walk); };
+    data.rows.forEach(function (r) {
+      if (iLon >= 0 && iLat >= 0) add(r[iLon], r[iLat]);
+      else if (iGeo >= 0 && r[iGeo]) {
+        try { const g = typeof r[iGeo] === "string" ? JSON.parse(r[iGeo]) : r[iGeo]; walk(g.coordinates || []); } catch (e) {}
+      }
     });
-    if (!lons.length) return;
+    if (x0 > x1) return;
     const pad = 0.006;
-    store.dispatch(KeplerGl.fitBounds([Math.min.apply(null, lons) - pad, Math.min.apply(null, lats) - pad,
-                                       Math.max.apply(null, lons) + pad, Math.max.apply(null, lats) + pad]));
+    store.dispatch(KeplerGl.fitBounds([x0 - pad, y0 - pad, x1 + pad, y1 + pad]));
   }
 
   /* ------------------------------------------------------------------ chart */
-  const SVG = "http://www.w3.org/2000/svg";
-  const svgEl = function (tag, attrs, text) {
-    const n = document.createElementNS(SVG, tag);
-    Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); });
-    if (text !== undefined) n.textContent = text;
-    return n;
-  };
-
-  // Readable names for SQL expressions: count_star() -> count, sum(length_km) -> km.
-  const pretty = function (name) {
-    const n = String(name).toLowerCase();
-    if (/^count(_star)?\(.*\)$|^count_star\(\)$/.test(n)) return "count";
-    if (n.indexOf("length_km") >= 0) return "km";
-    return String(name).replace(/_/g, " ");
-  };
-
   function renderChart(chart) {
     const box = el("div", "chart");
     if (chart.type === "number") {
@@ -214,85 +263,143 @@
       box.appendChild(el("div", "big", fmt.format(chart.value)));
       return box;
     }
-    box.appendChild(el("span", "label", pretty(chart.value) + " by " + pretty(chart.label)));
-    const W = 396, row = 24, labelW = 150, valueW = 70, barMax = W - labelW - valueW - 8;
+    const title = el("span", "label", pretty(chart.value) + " by " + pretty(chart.label));
+    if (chart.table) title.appendChild(el("span", "hint", "click a bar to show it on the map"));
+    box.appendChild(title);
+    const grid = el("div", "bars" + (chart.table ? " clickable" : ""));
     const max = Math.max.apply(null, chart.rows.map(function (r) { return Math.abs(r.value); })) || 1;
-    const svg = svgEl("svg", {width: W, height: chart.rows.length * row, role: "img",
-                              "aria-label": "Bar chart of " + chart.value + " by " + chart.label});
-    chart.rows.forEach(function (r, i) {
-      const y = i * row, w = Math.max(1, Math.abs(r.value) / max * barMax);
-      const name = r.label.length > 22 ? r.label.slice(0, 21) + "…" : r.label;
-      svg.appendChild(svgEl("text", {x: 0, y: y + 16, "font-size": 12, fill: "#5a5a52"}, name.replace(/_/g, " ")));
-      svg.appendChild(svgEl("rect", {x: labelW, y: y + 5, width: w, height: 14, fill: i === 0 ? "#171712" : "#5a5a52"}));
-      svg.appendChild(svgEl("text", {x: labelW + w + 6, y: y + 16, "font-size": 12, fill: "#171712",
-                                     "font-family": "IBM Plex Mono, monospace"}, fmt.format(r.value)));
+    chart.rows.forEach(function (r) {
+      const row = el("div", "bar-row");
+      const label = el("span", "bar-label", pretty(r.label));
+      const track = el("div", "bar-track");
+      const fill = el("div", "bar-fill");
+      track.appendChild(fill);
+      track.appendChild(el("span", "bar-value", fmt.format(r.value)));
+      row.appendChild(label);
+      row.appendChild(track);
+      setTimeout(function () { fill.style.width = (Math.abs(r.value) / max * 80) + "%"; }, 30);
+      if (chart.table) {
+        const pick = function () {
+          const wasOn = row.classList.contains("on");
+          document.querySelectorAll(".bars .bar-row.on").forEach(function (n) { n.classList.remove("on"); });
+          if (wasOn) { overlay("highlight", null); return; }
+          row.classList.add("on");
+          const qs = new URLSearchParams({table: chart.table, column: chart.label, value: r.label});
+          fetch("/api/highlight?" + qs).then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (layer) { overlay("highlight", layer); });
+        };
+        label.addEventListener("click", pick);
+        track.addEventListener("click", pick);
+      }
+      grid.appendChild(row);
     });
-    box.appendChild(svg);
+    box.appendChild(grid);
     return box;
   }
 
-  /* ------------------------------------------------------------------ ask */
+  /* ------------------------------------------------------------------ conversation */
   const form = document.getElementById("ask"), input = document.getElementById("question");
-  const go = document.getElementById("go"), results = document.getElementById("results");
-  const modelSel = document.getElementById("model");
+  const go = document.getElementById("go"), modelSel = document.getElementById("model");
+  const thread = document.getElementById("thread"), turns = document.getElementById("turns");
+  const chips = document.getElementById("chips"), collapseBtn = document.getElementById("collapse");
+  const asked = []; let recall = -1;
+
+  function setCollapsed(c) {
+    thread.classList.toggle("collapsed", c);
+    collapseBtn.textContent = c ? "Show" : "Hide";
+  }
 
   async function ask(question) {
-    const empty = results.querySelector(".empty");
-    if (empty) empty.remove();
-    const card = el("div", "card");
-    card.appendChild(el("p", "q", question));
-    const status = el("p", "status", "Thinking with " + modelSel.value);
-    card.appendChild(status);
-    results.prepend(card);
+    asked.push(question); recall = -1;
+    thread.hidden = false; chips.hidden = true; setCollapsed(false);
+    const turn = el("div", "turn");
+    turn.appendChild(el("p", "q", question));
+    const status = el("div", "thinking");
+    status.appendChild(el("span", "pulse"));
+    const statusText = el("span", "", "Thinking with " + modelSel.value + " · 0 s");
+    status.appendChild(statusText);
+    turn.appendChild(status);
+    turns.appendChild(turn);
+    turns.scrollTop = turns.scrollHeight;
+    const t0 = Date.now();
+    const timer = setInterval(function () {
+      statusText.textContent = "Thinking with " + modelSel.value + " · " + Math.round((Date.now() - t0) / 1000) + " s";
+    }, 500);
     go.disabled = true;
     try {
       const res = await fetch("/api/ask", {method: "POST", headers: {"Content-Type": "application/json"},
                                            body: JSON.stringify({question: question, model: modelSel.value})});
       const data = await res.json();
-      status.remove();
       if (!res.ok) throw new Error(data.error || res.statusText);
-      card.appendChild(richText("p", "a", data.answer));
-      if (data.chart) card.appendChild(renderChart(data.chart));
-      if (data.map) showAnswerOnMap(data.map);
+      status.remove();
+      turn.appendChild(richText("p", "a", data.answer));
+      if (data.chart) turn.appendChild(renderChart(data.chart));
+      overlay("highlight", null);
+      overlay("answer", data.map);
+      const meta = el("div", "meta");
       if (data.queries.length) {
         const det = el("details");
-        det.appendChild(el("summary", "label", "SQL · " + data.queries.length + " quer" + (data.queries.length === 1 ? "y" : "ies")));
+        det.appendChild(el("summary", "label", "Show SQL · " + data.queries.length + " quer" + (data.queries.length === 1 ? "y" : "ies")));
         data.queries.forEach(function (q) {
           det.appendChild(el("pre", q.ok ? "" : "failed",
-            (q.purpose ? "-- " + q.purpose + "\n" : "") + q.sql + (q.ok ? "\n-- " + q.rows + " rows" : "\n-- error: " + q.error)));
+            "-- " + (q.by === "kartograf" ? "Kartograf: " : "model: ") + (q.purpose || "query") + "\n" + q.sql +
+            (q.ok ? "\n-- " + q.rows + " rows" : "\n-- error: " + q.error)));
         });
-        card.appendChild(det);
+        meta.appendChild(det);
       }
-      const where = data.map ? " · " + data.map.rows + " on the map" : "";
-      card.appendChild(el("div", "label meta", data.model + " · " + data.seconds + " s" + where));
+      meta.appendChild(el("span", "label", data.model + " · " + data.seconds + " s" +
+                                         (data.map ? " · " + data.map.rows + " on the map" : "")));
+      turn.appendChild(meta);
     } catch (e) {
       status.remove();
-      card.appendChild(el("p", "a error", "Could not answer: " + e.message));
+      turn.appendChild(el("p", "a error", "Could not answer: " + e.message));
     } finally {
+      clearInterval(timer);
       go.disabled = false;
+      turns.scrollTop = turns.scrollHeight;
+      input.focus();
     }
   }
 
   form.addEventListener("submit", function (ev) {
     ev.preventDefault();
     const q = input.value.trim();
-    if (q && !go.disabled) ask(q);
+    if (q && !go.disabled) { input.value = ""; ask(q); }
   });
-  const chips = document.getElementById("chips");
   EXAMPLES.forEach(function (t) {
     const b = el("button", "", t);
     b.type = "button";
-    b.addEventListener("click", function () { input.value = t; if (!go.disabled) ask(t); });
+    b.addEventListener("click", function () { if (!go.disabled) ask(t); });
     chips.appendChild(b);
+  });
+  collapseBtn.addEventListener("click", function () { setCollapsed(!thread.classList.contains("collapsed")); });
+  document.getElementById("clear").addEventListener("click", function () {
+    turns.textContent = ""; thread.hidden = true; chips.hidden = false;
+    overlay("answer", null); overlay("highlight", null);
+    input.focus();
+  });
+
+  // Keyboard: "/" focuses, Esc collapses, Up/Down recall earlier questions.
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "/" && document.activeElement !== input) { ev.preventDefault(); input.focus(); }
+    if (ev.key === "Escape" && !thread.hidden) setCollapsed(true);
+  });
+  input.addEventListener("keydown", function (ev) {
+    if (!asked.length || (ev.key !== "ArrowUp" && ev.key !== "ArrowDown")) return;
+    ev.preventDefault();
+    if (ev.key === "ArrowUp") recall = recall < 0 ? asked.length - 1 : Math.max(0, recall - 1);
+    else recall = recall < 0 || recall + 1 >= asked.length ? -1 : recall + 1;
+    input.value = recall < 0 ? "" : asked[recall];
   });
 
   fetch("/api/meta").then(function (r) { return r.json(); }).then(function (m) {
     document.getElementById("scope").textContent = m.area + " · Overture " + m.release;
     m.models.forEach(function (name) { modelSel.appendChild(el("option", "", name)); });
-    // ?q=... asks on load, so a question can be bookmarked or shared locally.
+    // ?q=... asks on load, so a question can be bookmarked locally.
     const params = new URLSearchParams(location.search);
     if (params.get("model") && m.models.indexOf(params.get("model")) >= 0) modelSel.value = params.get("model");
-    if (params.get("q")) { input.value = params.get("q"); ask(params.get("q")); }
+    if (params.get("q")) ask(params.get("q"));
+    else input.focus();
   });
 </script>
 </body>

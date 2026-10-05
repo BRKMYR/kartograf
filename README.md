@@ -61,8 +61,10 @@ python server.py        # then open http://localhost:8766
 ```
 
 A single page in the Kartograf look (Inter Tight, IBM Plex Mono labels, the
-warm monochrome palette of the BRKMYR site): the kepler.gl map on the left, a
-search bar on the right. Ask in German or English. Each answer comes with:
+warm monochrome palette of the BRKMYR site): the kepler.gl map fills the screen
+and the ask bar sits at the bottom centre, with suggestions until the first
+question. Answers slide up above the bar as a thread you can hide or clear.
+Questions work in English or German. Each answer comes with:
 
 - **the answer text** from the local model (Qwen3 8B with thinking off by default,
   about 10 to 25 seconds; Llama 3.1 8B selectable in the header),
@@ -70,6 +72,8 @@ search bar on the right. Ask in German or English. Each answer comes with:
   the server reruns it grouped by road class or place category, so
   "Wie viele Straßenkilometer hat Frankfurt?" comes back with km per class,
 - **the matching places on the map**, highlighted in ink, and the map flies to them,
+- **clickable bars**: click "motorway" and those 767 segments light up on the map
+  (`/api/highlight`, whitelisted columns, value bound as a SQL parameter),
 - **every SQL statement**, the model's and the ones Kartograf added for the chart
   and the map, labelled by who wrote them.
 
@@ -79,6 +83,8 @@ writing failing SQL and invented a road total. The model now gets one short
 data-context note (the tables are Frankfurt; roads are classified roads only), and
 the breakdown reuses the model's own filter verbatim, so the chart explains the
 model's number, including when it is wrong. `?q=...` in the URL asks on load.
+Keyboard: `/` focuses the bar, Enter asks, Up and Down recall earlier questions,
+Esc hides the thread.
 
 The server binds to 127.0.0.1 only. Model output is rendered as text, never as HTML.
 
@@ -264,7 +270,7 @@ Where the DuckDB spatial extension is available, `ST_*` functions also work on
 .venv/bin/python -m pytest -q
 ```
 
-83 tests, no network, no API key and no Ollama needed. They cover the SQL guard
+85 tests, no network, no API key and no Ollama needed. They cover the SQL guard
 against injection and write attempts, the geodesic length against known distances,
 the tool loop recovering from a bad query, the weekly series matching its real
 anchors exactly, the refusal to compare releases of different scope, every chart

@@ -18,6 +18,7 @@ import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import pandas as pd
 
@@ -73,6 +74,17 @@ def derived_queries(sql: str) -> dict[str, str]:
     return out
 
 
+def chart_source(chart: dict | None, sqls: list[str]) -> dict | None:
+    """Tag a bar chart with the table its label column belongs to, if clickable."""
+    if not chart or chart["type"] != "bar":
+        return chart
+    for sql in reversed(sqls):
+        m = re.search(r"\bfrom\s+(roads|places)\b", sql, re.IGNORECASE)
+        if m and (m[1].lower(), chart["label"]) in HIGHLIGHT_COLUMNS:
+            return {**chart, "table": m[1].lower()}
+    return chart
+
+
 def pick_chart(results: list[pd.DataFrame]) -> dict | None:
     """Bar chart from the last result with a label column and a numeric column;
     otherwise a single-number card. None when nothing is chartable."""
@@ -104,6 +116,23 @@ def map_layer(store: DataStore, sqls: list[str]) -> dict | None:
             return {"id": "answer", "label": "Answer", "csv": frame.to_csv(index=False),
                     "columns": list(frame.columns), "rows": len(frame)}
     return None
+
+
+# Chart bars the user can click: (table, column) pairs only, value bound as a parameter.
+HIGHLIGHT_COLUMNS = {("roads", "class"), ("places", "category"), ("places", "basic_category")}
+
+
+def highlight_layer(store: DataStore, table: str, column: str, value: str) -> dict | None:
+    """Rows of one chart bar, for the map. Whitelisted table and column; the value
+    is a bound parameter, never spliced into SQL."""
+    if (table, column) not in HIGHLIGHT_COLUMNS:
+        return None
+    df = store.con.execute(f'SELECT * FROM "{table}" WHERE "{column}" = ? LIMIT {MAP_ROWS}', [value]).fetchdf()
+    if df.empty or not kepler_view.is_mappable(df):
+        return None
+    frame, _ = kepler_view.prepare(df, MAP_ROWS)
+    return {"id": "highlight", "label": f"{column} = {value}", "csv": frame.to_csv(index=False),
+            "columns": list(frame.columns), "rows": len(frame)}
 
 
 def base_layers(store: DataStore) -> list[dict]:
@@ -147,7 +176,9 @@ def ask(store: DataStore, question: str, model: str) -> dict:
 
     return {
         "answer": result.answer, "model": result.model, "seconds": round(result.seconds, 1),
-        "queries": queries, "chart": pick_chart(frames), "map": map_layer(store, map_sqls),
+        "queries": queries,
+        "chart": chart_source(pick_chart(frames), [q["sql"] for q in queries if q["ok"]]),
+        "map": map_layer(store, map_sqls),
     }
 
 
@@ -179,6 +210,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(HTTPStatus.OK, self.layers_json)
         if path == "/api/meta":
             return self._json(self.meta)
+        if path == "/api/highlight":
+            q = parse_qs(urlsplit(self.path).query)
+            args = [q.get(k, [""])[0][:200] for k in ("table", "column", "value")]
+            with self.lock:
+                layer = highlight_layer(self.store, *args)
+            return self._json(layer) if layer else self._json({"error": "nothing to highlight"}, HTTPStatus.NOT_FOUND)
         self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:  # noqa: N802
