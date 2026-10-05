@@ -1,41 +1,57 @@
 # Kartograf
 
-Ask map questions in German or English and get answers you can audit. A local
-Llama 3.1 8B (through Ollama) writes spatial SQL over Overture Maps data for
-Frankfurt, DuckDB runs it, and the result shows up on a kepler.gl map. An eval
-harness scores the model against a second local model on 20 questions with
-known answers.
+Ask a city map a question. A language model running on your laptop writes
+spatial SQL over open [Overture Maps](https://overturemaps.org) data for
+Frankfurt, DuckDB runs it read-only, and the answer comes back with a chart, the
+matching places on a [kepler.gl](https://kepler.gl) map, and every SQL statement
+behind it. An eval harness scores local models on 20 questions with reference
+answers, in English and German.
 
-The Streamlit app has six working surfaces: a chat that writes auditable SQL, a
-kepler.gl map, a release-coverage view over Overture data for Germany,
-per-table statistics, the raw data with a SQL box, and a query log.
+![Kartograf: an answer with a chart of kilometres by road class above the ask bar, over a light map of Frankfurt](docs/img/answer.png)
 
-The model never sees the raw data. It sees the schema plus three sample rows per
-table and has one tool: `run_sql`. Every query passes a read-only guard, runs in
-an in-memory DuckDB with external access disabled, and is shown to the user next
-to the answer. That is the whole trust model: the answer is only as good as the
-SQL, and the SQL is always visible.
+- **Local by default.** Qwen3 8B or Llama 3.1 8B through Ollama. No data leaves
+  the machine; Claude through the Anthropic API is an option in the workbench.
+- **Auditable.** The model gets one tool, `run_sql`. Every statement passes a
+  read-only guard, runs in an in-memory DuckDB with external access disabled,
+  and is listed with the answer.
+- **Charts that explain the number.** Totals are rerun grouped by road class or
+  place category with the model's own filter, so a wrong filter shows.
+- **Measured.** Baseline: Qwen3 8B 15 of 20, Llama 3.1 8B 12 of 20, runnable SQL
+  for every answerable question. See [Evals](#evals).
 
-## Run
+## Quickstart
+
+Needs Python 3.11 or newer, about 10 GB of disk for two models, and 16 GB of RAM.
 
 ```bash
+git clone https://github.com/BRKMYR/kartograf && cd kartograf
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# Default: fully local, no data leaves the machine
-brew install ollama && ollama serve &
-ollama pull llama3.1:8b
-ollama pull qwen3:8b            # optional, for the eval comparison
+brew install ollama && ollama serve &      # or the Ollama app from ollama.com
+ollama pull qwen3:8b                       # web app default
+ollama pull llama3.1:8b                    # optional second model
 
-# Optional: Claude through the Anthropic API instead
-export ANTHROPIC_API_KEY=sk-ant-...
-
-# Frankfurt roads and places, about 40 MB of transfer
+# Frankfurt roads and places from the public Overture bucket, about 40 MB
 python fetch_overture.py --preset frankfurt --releases 2026-09-23.1 --places \
     --map-classes motorway trunk primary secondary tertiary
 
+python server.py                           # open http://localhost:8766
+```
+
+Try "How many kilometres of road does Frankfurt have?" or "How many pharmacies
+are within 1 km of the main station (lon 8.6625, lat 50.1070)?".
+
+## The Streamlit workbench
+
+```bash
 streamlit run app.py
 ```
+
+The workbench has six surfaces: a chat that writes auditable SQL, a kepler.gl
+map, a release-coverage view over Overture data for Germany, per-table
+statistics, the raw data with a SQL box, and a query log. Ollama is the default
+provider; set `ANTHROPIC_API_KEY` to use Claude instead.
 
 Pick "Frankfurt am Main area" in the sidebar, click "Load latest release as roads +
 places", then ask:
@@ -56,9 +72,7 @@ plus district polygons. Try:
 
 ## The web app: map plus agent search
 
-```bash
-python server.py        # then open http://localhost:8766
-```
+`python server.py`, then http://localhost:8766.
 
 A single page in the Kartograf look (Inter Tight, IBM Plex Mono labels, the
 warm monochrome palette of the BRKMYR site): the kepler.gl map fills the screen
@@ -337,3 +351,19 @@ What the failures say:
 Small local models are fast enough to explore with. On their own they are not
 reliable enough to trust with a number nobody checks, which is why every answer
 comes with its SQL.
+
+## Licence
+
+Code: [MIT](LICENSE). Data, models and libraries keep their own licences; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). In short:
+
+- Overture extracts are not in this repository. `fetch_overture.py` rebuilds them,
+  and anything you publish from them needs the attribution above (ODbL for roads,
+  per-source licences for places).
+- No model weights are included. Kartograf calls models you install through
+  Ollama, under their own licences (Qwen3: Apache 2.0; Llama 3.1: Llama 3.1
+  Community License).
+
+Independent project. Not affiliated with, endorsed by or sponsored by the Overture
+Maps Foundation, the OpenStreetMap Foundation, Foursquare, Meta, Alibaba or CARTO.
+
