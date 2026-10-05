@@ -7,7 +7,7 @@ matching places on a [kepler.gl](https://kepler.gl) map, and every SQL statement
 behind it. An eval harness scores local models on 20 questions with reference
 answers, in English and German.
 
-![Kartograf: an answer with a chart of kilometres by road class above the ask bar, over a light map of Frankfurt](docs/img/answer.png)
+![Kartograf: an answer with a chart of kilometres by road class above the ask bar, motorways highlighted on a light map of Frankfurt](docs/img/kartograf.jpg)
 
 - **Local by default.** Qwen3 8B or Llama 3.1 8B through Ollama. No data leaves
   the machine; Claude through the Anthropic API is an option in the workbench.

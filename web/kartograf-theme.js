@@ -73,7 +73,7 @@
         dataId: d.id, label: d.label, color: rgb(answer ? C.ink : C.place),
         columns: {lat: "lat", lng: "lon"}, isVisible: true,
         visConfig: answer
-          ? {radius: 6, opacity: 0.95, filled: true, outline: true, thickness: 2, strokeColor: rgb(C.bg)}
+          ? {radius: 30, opacity: 0.95, filled: true, outline: true, thickness: 3, strokeColor: rgb(C.bg)}
           : {radius: 1.2, opacity: 0.3, filled: true}
       }
     };
