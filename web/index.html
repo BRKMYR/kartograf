@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Kartograf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
+<link href="https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/redux@4.2.1/dist/redux.js" crossorigin></script>
+<script src="https://unpkg.com/react-redux@8.1.2/dist/react-redux.min.js" crossorigin></script>
+<script src="https://unpkg.com/styled-components@6.1.8/dist/styled-components.min.js" crossorigin></script>
+<script src="https://unpkg.com/kepler.gl@3.2.6/umd/keplergl.min.js"></script>
+<script src="/kartograf-theme.js"></script>
+<style>
+  :root {
+    --bg: #eeeee8; --paper: #f6f6f1; --panel: #e6e6de; --ink: #171712; --sec: #5a5a52;
+    --mute: #8a8a80; --rule: #d7d7cd;
+    --sans: "Inter Tight", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --track: 0.16em; --label: 0.68rem;
+    --side: 440px; --head: 56px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: var(--sans); overflow: hidden; }
+  /* The grid lives on its own element: kepler and maplibre append portals to <body>,
+     which would otherwise become extra grid rows and shorten the map. */
+  .app { display: grid; grid-template-rows: var(--head) minmax(0, 1fr); grid-template-columns: minmax(0, 1fr) var(--side);
+         height: 100vh; }
+
+  header { grid-column: 1 / 3; display: flex; align-items: center; gap: 20px; padding: 0 22px;
+           border-bottom: 1px solid var(--rule); background: var(--bg); }
+  .brand { font-weight: 600; font-size: 1.35rem; letter-spacing: -0.01em; }
+  .label { font-family: var(--mono); font-size: var(--label); letter-spacing: var(--track);
+           text-transform: uppercase; color: var(--sec); }
+  header .spacer { flex: 1; }
+  header select { font-family: var(--mono); font-size: var(--label); letter-spacing: 0.08em; color: var(--ink);
+                  background: var(--paper); border: 1px solid var(--rule); padding: 6px 8px; }
+
+  #map { position: relative; min-width: 0; min-height: 0; }
+  #map .maplibregl-canvas { filter: sepia(0.16) saturate(0.7); }  /* warm the Positron basemap */
+
+  aside { border-left: 1px solid var(--rule); display: flex; flex-direction: column; min-height: 0; background: var(--bg); }
+  form { padding: 18px 20px 12px; border-bottom: 1px solid var(--rule); }
+  .search { display: flex; gap: 8px; }
+  .search input { flex: 1; min-width: 0; font: 400 0.98rem var(--sans); color: var(--ink); background: var(--paper);
+                  border: 1px solid var(--rule); padding: 11px 12px; outline: none; }
+  .search input:focus { border-color: var(--ink); }
+  .search button { font: 500 0.92rem var(--sans); color: var(--bg); background: var(--ink); border: 0; padding: 0 16px; cursor: pointer; }
+  .search button:disabled { background: var(--mute); cursor: wait; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chips button { font: 400 0.78rem var(--sans); color: var(--sec); background: transparent; border: 1px solid var(--rule);
+                  padding: 5px 8px; cursor: pointer; text-align: left; }
+  .chips button:hover { color: var(--ink); border-color: var(--sec); }
+
+  #results { overflow-y: auto; padding: 4px 20px 24px; flex: 1; }
+  .card { padding: 16px 0 18px; border-bottom: 1px solid var(--rule); }
+  .q { font-weight: 600; font-size: 0.98rem; margin: 0 0 8px; }
+  .a strong { font-weight: 600; color: var(--ink); }
+  .a { font-size: 0.95rem; line-height: 1.45; color: #1d1d1d; white-space: pre-wrap; margin: 0; }
+  .meta { margin-top: 10px; }
+  .status { color: var(--sec); font-size: 0.9rem; }
+  .status::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1.2s steps(4) infinite; }
+  @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+  .error { color: #8a1c1c; }
+
+  .chart { margin-top: 14px; }
+  .chart .label { display: block; margin-bottom: 8px; }
+  .big { font-weight: 600; font-size: 2.4rem; letter-spacing: -0.02em; line-height: 1; }
+  svg text { font-family: var(--sans); }
+
+  details { margin-top: 12px; }
+  summary { cursor: pointer; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  pre { font-family: var(--mono); font-size: 0.72rem; line-height: 1.5; background: var(--paper); border: 1px solid var(--rule);
+        padding: 10px; margin: 8px 0 0; white-space: pre-wrap; word-break: break-word; color: var(--ink); }
+  pre.failed { color: var(--mute); }
+  .empty { color: var(--sec); font-size: 0.9rem; line-height: 1.5; padding-top: 16px; }
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <span class="brand">Kartograf</span>
+  <span class="label" id="scope">Frankfurt am Main</span>
+  <span class="spacer"></span>
+  <span class="label">Local model</span>
+  <select id="model" aria-label="Model"></select>
+</header>
+
+<div id="map"></div>
+
+<aside>
+  <form id="ask">
+    <div class="search">
+      <input id="question" autocomplete="off" placeholder="Ask about Frankfurt, in German or English" />
+      <button id="go" type="submit">Ask</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </form>
+  <div id="results">
+    <p class="empty">Ask a question. The local model writes SQL over Overture roads and places,
+      runs it, and answers with the numbers, a chart and the SQL it used. Places it finds
+      are drawn on the map.</p>
+  </div>
+</aside>
+</div>
+
+<script>
+  const EXAMPLES = [
+    "Wie viele Straßenkilometer hat Frankfurt?",
+    "Which road class has the largest total length?",
+    "Apotheken im Umkreis von 1 km um den Hauptbahnhof (lon 8.6625, lat 50.1070)",
+    "Most common place categories within 500 m of the Hauptwache (lon 8.6791, lat 50.1137)"
+  ];
+  const fmt = new Intl.NumberFormat(navigator.language || "de-DE", {maximumFractionDigits: 2});
+  const el = function (tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;   // textContent only: model output is never parsed as HTML
+    return n;
+  };
+
+  // Minimal, safe Markdown: **bold** only, built from text nodes, never innerHTML.
+  function richText(tag, cls, text) {
+    const n = el(tag, cls);
+    String(text).replace(/^#+\s*/gm, "").split("**").forEach(function (part, i) {
+      n.appendChild(i % 2 ? el("strong", "", part) : document.createTextNode(part));
+    });
+    return n;
+  }
+
+  /* ------------------------------------------------------------------ map */
+  const reducers = Redux.combineReducers({keplerGl: KeplerGl.keplerGlReducer});
+  const store = Redux.createStore(reducers, {}, Redux.applyMiddleware(...KeplerGl.enhanceReduxMiddleware([])));
+  const mapBox = document.getElementById("map");
+  const toKepler = function (d) { return {info: {id: d.id, label: d.label}, data: KeplerGl.processCsvData(d.csv)}; };
+
+  function MapApp() {
+    const [size, setSize] = React.useState({width: mapBox.clientWidth, height: mapBox.clientHeight});
+    React.useEffect(function () {
+      const ro = new ResizeObserver(function () { setSize({width: mapBox.clientWidth, height: mapBox.clientHeight}); });
+      ro.observe(mapBox);
+      // After mount: KeplerGl has registered "map", so dispatches are not dropped.
+      fetch("/api/layers").then(function (r) { return r.json(); }).then(function (layers) {
+        store.dispatch(KeplerGl.addDataToMap({
+          datasets: layers.map(toKepler),
+          options: {centerMap: true, autoCreateLayers: false},
+          config: {version: "v1", config: {
+            mapStyle: {styleType: "positron"},
+            visState: {layers: layers.map(function (d) { return Kartograf.layer(d, false); })}
+          }}
+        }));
+        if (KeplerGl.toggleSidePanel) store.dispatch(KeplerGl.toggleSidePanel(null));
+      });
+      return function () { ro.disconnect(); };
+    }, []);
+    return React.createElement(KeplerGl.KeplerGl, {
+      id: "map", theme: Kartograf.theme(KeplerGl), mapboxApiAccessToken: "",
+      appName: "Kartograf", version: "", width: size.width, height: size.height
+    });
+  }
+  ReactDOM.createRoot(mapBox).render(React.createElement(ReactRedux.Provider, {store: store}, React.createElement(MapApp)));
+
+  function showAnswerOnMap(layer) {
+    const present = (store.getState().keplerGl.map || {}).visState;
+    if (present && present.datasets && present.datasets.answer) store.dispatch(KeplerGl.removeDataset("answer"));
+    if (!layer) return;
+    const ds = toKepler(layer);
+    store.dispatch(KeplerGl.addDataToMap({
+      datasets: [ds],
+      options: {centerMap: false, keepExistingConfig: true, autoCreateLayers: false},
+      config: {version: "v1", config: {visState: {layers: [Kartograf.layer(layer, true)]}}}
+    }));
+    // Fly to the answer. Padded, so a single place does not zoom to street level.
+    const names = ds.data.fields.map(function (f) { return f.name; });
+    const iLon = names.indexOf("lon"), iLat = names.indexOf("lat");
+    if (iLon < 0 || iLat < 0 || !KeplerGl.fitBounds) return;
+    const lons = [], lats = [];
+    ds.data.rows.forEach(function (r) {
+      if (typeof r[iLon] === "number" && typeof r[iLat] === "number") { lons.push(r[iLon]); lats.push(r[iLat]); }
+    });
+    if (!lons.length) return;
+    const pad = 0.006;
+    store.dispatch(KeplerGl.fitBounds([Math.min.apply(null, lons) - pad, Math.min.apply(null, lats) - pad,
+                                       Math.max.apply(null, lons) + pad, Math.max.apply(null, lats) + pad]));
+  }
+
+  /* ------------------------------------------------------------------ chart */
+  const SVG = "http://www.w3.org/2000/svg";
+  const svgEl = function (tag, attrs, text) {
+    const n = document.createElementNS(SVG, tag);
+    Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    if (text !== undefined) n.textContent = text;
+    return n;
+  };
+
+  // Readable names for SQL expressions: count_star() -> count, sum(length_km) -> km.
+  const pretty = function (name) {
+    const n = String(name).toLowerCase();
+    if (/^count(_star)?\(.*\)$|^count_star\(\)$/.test(n)) return "count";
+    if (n.indexOf("length_km") >= 0) return "km";
+    return String(name).replace(/_/g, " ");
+  };
+
+  function renderChart(chart) {
+    const box = el("div", "chart");
+    if (chart.type === "number") {
+      box.appendChild(el("span", "label", pretty(chart.label)));
+      box.appendChild(el("div", "big", fmt.format(chart.value)));
+      return box;
+    }
+    box.appendChild(el("span", "label", pretty(chart.value) + " by " + pretty(chart.label)));
+    const W = 396, row = 24, labelW = 150, valueW = 70, barMax = W - labelW - valueW - 8;
+    const max = Math.max.apply(null, chart.rows.map(function (r) { return Math.abs(r.value); })) || 1;
+    const svg = svgEl("svg", {width: W, height: chart.rows.length * row, role: "img",
+                              "aria-label": "Bar chart of " + chart.value + " by " + chart.label});
+    chart.rows.forEach(function (r, i) {
+      const y = i * row, w = Math.max(1, Math.abs(r.value) / max * barMax);
+      const name = r.label.length > 22 ? r.label.slice(0, 21) + "…" : r.label;
+      svg.appendChild(svgEl("text", {x: 0, y: y + 16, "font-size": 12, fill: "#5a5a52"}, name.replace(/_/g, " ")));
+      svg.appendChild(svgEl("rect", {x: labelW, y: y + 5, width: w, height: 14, fill: i === 0 ? "#171712" : "#5a5a52"}));
+      svg.appendChild(svgEl("text", {x: labelW + w + 6, y: y + 16, "font-size": 12, fill: "#171712",
+                                     "font-family": "IBM Plex Mono, monospace"}, fmt.format(r.value)));
+    });
+    box.appendChild(svg);
+    return box;
+  }
+
+  /* ------------------------------------------------------------------ ask */
+  const form = document.getElementById("ask"), input = document.getElementById("question");
+  const go = document.getElementById("go"), results = document.getElementById("results");
+  const modelSel = document.getElementById("model");
+
+  async function ask(question) {
+    const empty = results.querySelector(".empty");
+    if (empty) empty.remove();
+    const card = el("div", "card");
+    card.appendChild(el("p", "q", question));
+    const status = el("p", "status", "Thinking with " + modelSel.value);
+    card.appendChild(status);
+    results.prepend(card);
+    go.disabled = true;
+    try {
+      const res = await fetch("/api/ask", {method: "POST", headers: {"Content-Type": "application/json"},
+                                           body: JSON.stringify({question: question, model: modelSel.value})});
+      const data = await res.json();
+      status.remove();
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      card.appendChild(richText("p", "a", data.answer));
+      if (data.chart) card.appendChild(renderChart(data.chart));
+      if (data.map) showAnswerOnMap(data.map);
+      if (data.queries.length) {
+        const det = el("details");
+        det.appendChild(el("summary", "label", "SQL · " + data.queries.length + " quer" + (data.queries.length === 1 ? "y" : "ies")));
+        data.queries.forEach(function (q) {
+          det.appendChild(el("pre", q.ok ? "" : "failed",
+            (q.purpose ? "-- " + q.purpose + "\n" : "") + q.sql + (q.ok ? "\n-- " + q.rows + " rows" : "\n-- error: " + q.error)));
+        });
+        card.appendChild(det);
+      }
+      const where = data.map ? " · " + data.map.rows + " on the map" : "";
+      card.appendChild(el("div", "label meta", data.model + " · " + data.seconds + " s" + where));
+    } catch (e) {
+      status.remove();
+      card.appendChild(el("p", "a error", "Could not answer: " + e.message));
+    } finally {
+      go.disabled = false;
+    }
+  }
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    const q = input.value.trim();
+    if (q && !go.disabled) ask(q);
+  });
+  const chips = document.getElementById("chips");
+  EXAMPLES.forEach(function (t) {
+    const b = el("button", "", t);
+    b.type = "button";
+    b.addEventListener("click", function () { input.value = t; if (!go.disabled) ask(t); });
+    chips.appendChild(b);
+  });
+
+  fetch("/api/meta").then(function (r) { return r.json(); }).then(function (m) {
+    document.getElementById("scope").textContent = m.area + " · Overture " + m.release;
+    m.models.forEach(function (name) { modelSel.appendChild(el("option", "", name)); });
+    // ?q=... asks on load, so a question can be bookmarked or shared locally.
+    const params = new URLSearchParams(location.search);
+    if (params.get("model") && m.models.indexOf(params.get("model")) >= 0) modelSel.value = params.get("model");
+    if (params.get("q")) { input.value = params.get("q"); ask(params.get("q")); }
+  });
+</script>
+</body>
+</html>

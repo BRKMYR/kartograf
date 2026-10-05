@@ -46,6 +46,16 @@ metres) instead.
 | Latest stable kepler.gl (3.2.6), not the 3.3 alpha | The upstream example pins an alpha; a demo should not depend on one |
 | `reference_sql` instead of hard-coded answers | The eval set survives a new Overture release |
 
+## Web app
+
+`server.py` serves `web/index.html` and three endpoints on 127.0.0.1: `/api/meta`,
+`/api/layers` (roads and places as CSV for kepler) and `/api/ask`. One lock guards
+the single DuckDB connection. The model answers with the same `run_sql` tool; the
+server then derives a chart query (same filter, grouped by class or category) and a
+map query (the matching places) from the model's last simple aggregate, runs them
+through the same read-only guard, and returns them in the SQL list labelled
+`kartograf`. Asking an 8B model for that second query made its first one worse.
+
 ## Swapping the model
 
 Every model call goes through `llm.chat_ollama(store, history, question, model=..., host=...)`.

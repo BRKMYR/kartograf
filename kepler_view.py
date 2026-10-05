@@ -12,10 +12,13 @@ no Mapbox token.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pandas as pd
 
 KEPLER_VERSION = "3.2.6"
+# Kartograf look (brkmyr.com palette, Inter Tight), shared with web/index.html.
+THEME_JS = (Path(__file__).parent / "web" / "kartograf-theme.js").read_text(encoding="utf-8")
 MAX_ROWS = 200_000
 
 # CARTO styles shipped with kepler.gl 3.x; no token required.
@@ -29,6 +32,7 @@ _TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8" />
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link href="https://unpkg.com/maplibre-gl@^3/dist/maplibre-gl.css" rel="stylesheet" />
 <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
@@ -36,7 +40,9 @@ _TEMPLATE = """<!DOCTYPE html>
 <script src="https://unpkg.com/react-redux@8.1.2/dist/react-redux.min.js" crossorigin></script>
 <script src="https://unpkg.com/styled-components@6.1.8/dist/styled-components.min.js" crossorigin></script>
 <script src="https://unpkg.com/kepler.gl@__VERSION__/umd/keplergl.min.js"></script>
-<style>body { margin: 0; padding: 0; overflow: hidden; background: __BG__; }</style>
+<script>__THEME_JS__</script>
+<style>body { margin: 0; padding: 0; overflow: hidden; background: __BG__; }
+  .maplibregl-canvas { filter: __TINT__; }</style>
 </head>
 <body>
 <div id="app"></div>
@@ -68,7 +74,8 @@ _TEMPLATE = """<!DOCTYPE html>
       return function () { window.removeEventListener("resize", onResize); };
     }, []);
     return React.createElement(KeplerGl.KeplerGl, {
-      id: "map", theme: THEME, mapboxApiAccessToken: "",
+      id: "map", theme: THEME === "light" ? Kartograf.theme(KeplerGl) : THEME, mapboxApiAccessToken: "",
+      appName: "Kartograf", version: "",
       width: size.width, height: size.height
     });
   }
@@ -121,7 +128,9 @@ def build_kepler_html(datasets: dict[str, pd.DataFrame], theme: str = "light",
     data_js = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c")
     return (_TEMPLATE
             .replace("__VERSION__", KEPLER_VERSION)
-            .replace("__BG__", "#0e1117" if theme == "dark" else "#ffffff")
+            .replace("__THEME_JS__", THEME_JS.replace("</", "<\\/"))
+            .replace("__TINT__", "none" if theme == "dark" else "sepia(0.16) saturate(0.7)")
+            .replace("__BG__", "#0e1117" if theme == "dark" else "#eeeee8")
             .replace("__THEME__", theme)
             .replace("__BASEMAP__", BASEMAP[theme])
             .replace("__DATASETS__", data_js))

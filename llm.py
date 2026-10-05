@@ -88,8 +88,9 @@ class ChatResult:
     stop_reason: str | None = None
 
 
-def build_system_prompt(store: DataStore) -> str:
-    return SYSTEM_PROMPT.format(max_rows=MAX_RESULT_ROWS, schema=store.schema_description())
+def build_system_prompt(store: DataStore, extra: str = "") -> str:
+    prompt = SYSTEM_PROMPT.format(max_rows=MAX_RESULT_ROWS, schema=store.schema_description())
+    return prompt + ("\n" + extra.strip() + "\n" if extra.strip() else "")
 
 
 def execute_run_sql(store: DataStore, args: dict[str, Any], records: list[QueryRecord]) -> tuple[str, bool]:
@@ -200,12 +201,19 @@ def chat_ollama(
     model: str = "llama3.1:8b",
     host: str | None = None,
     on_status: Callable[[str], None] | None = None,
+    extra_instructions: str = "",
+    think: bool | None = None,
 ) -> tuple[ChatResult, list[dict[str, Any]]]:
-    """Same loop against a local Ollama model that supports tool calling."""
+    """Same loop against a local Ollama model that supports tool calling.
+
+    extra_instructions is appended to the system prompt (the web app uses it to
+    ask for a chart-ready breakdown); evals leave it empty. think=False turns off
+    the reasoning phase of models that have one (qwen3), which is much faster.
+    """
     import ollama
 
     client = ollama.Client(host=host) if host else ollama.Client()
-    messages = [{"role": "system", "content": build_system_prompt(store)}] + list(history) \
+    messages = [{"role": "system", "content": build_system_prompt(store, extra_instructions)}] + list(history) \
         + [{"role": "user", "content": user_message}]
     records: list[QueryRecord] = []
     t0 = time.perf_counter()
@@ -215,7 +223,8 @@ def chat_ollama(
     for _ in range(MAX_TOOL_ROUNDS + 1):
         if on_status:
             on_status("Thinking (local model)...")
-        response = client.chat(model=model, messages=messages, tools=[_ollama_tool_spec()])
+        extra = {} if think is None else {"think": think}
+        response = client.chat(model=model, messages=messages, tools=[_ollama_tool_spec()], **extra)
         msg = response.message
         in_tok += getattr(response, "prompt_eval_count", 0) or 0
         out_tok += getattr(response, "eval_count", 0) or 0

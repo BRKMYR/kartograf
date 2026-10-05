@@ -54,6 +54,34 @@ plus district polygons. Try:
 - How many sessions happened inside pilot-zone districts? Use the bounding boxes.
 - Total revenue per operator, sorted.
 
+## The web app: map plus agent search
+
+```bash
+python server.py        # then open http://localhost:8766
+```
+
+A single page in the Kartograf look (Inter Tight, IBM Plex Mono labels, the
+warm monochrome palette of the BRKMYR site): the kepler.gl map on the left, a
+search bar on the right. Ask in German or English. Each answer comes with:
+
+- **the answer text** from the local model (Qwen3 8B with thinking off by default,
+  about 10 to 25 seconds; Llama 3.1 8B selectable in the header),
+- **a chart**: when the model's query is a simple total over `roads` or `places`,
+  the server reruns it grouped by road class or place category, so
+  "Wie viele Straßenkilometer hat Frankfurt?" comes back with km per class,
+- **the matching places on the map**, highlighted in ink, and the map flies to them,
+- **every SQL statement**, the model's and the ones Kartograf added for the chart
+  and the map, labelled by who wrote them.
+
+Deriving the chart on the server, instead of asking the model for a second
+query, was a measured decision: with the longer prompt, Llama 3.1 8B started
+writing failing SQL and invented a road total. The model now gets one short
+data-context note (the tables are Frankfurt; roads are classified roads only), and
+the breakdown reuses the model's own filter verbatim, so the chart explains the
+model's number, including when it is wrong. `?q=...` in the URL asks on load.
+
+The server binds to 127.0.0.1 only. Model output is rendered as text, never as HTML.
+
 ## The Map tab: kepler.gl
 
 The Map tab draws any loaded table that has `lon`/`lat` columns or GeoJSON
@@ -201,6 +229,8 @@ Everything on the tab is downloadable as CSV.
 
 ```
 app.py           Streamlit UI: sidebar, chat, map, releases, statistics, data, query log
+server.py        Web app API on localhost: base layers, ask, chart and map derivation
+web/             index.html (map plus agent search) and kartograf-theme.js (shared kepler theme)
 kepler_view.py   kepler.gl page builder: light/dark theme, token-free basemap, escaped data
 run_evals.py     Eval runner and scorer: number, set and refusal checks per question
 evals/           questions.yaml (20 DE/EN questions) and results/ (JSONL per model, SUMMARY.md)
@@ -215,6 +245,7 @@ test_releases.py Release stats, weekly series, incident injection, chart specs
 test_storage.py  Presets, transfer estimate, compaction with verification, gzip loading
 test_kepler_view.py  Theme, pinned version, row cap, script-block escaping
 test_evals.py    Number parsing (German and English), scorer, question file balance
+test_server.py   Derived breakdown and map queries, chart selection
 sample_data/     Synthetic CSV + GeoJSON so the app runs without any real data
 data/overture/   One folder per region plus shared caches (gitignored, reproducible)
 query_log.jsonl  Appended per turn: question, SQL, answer, latency, tokens (gitignored)
@@ -233,7 +264,7 @@ Where the DuckDB spatial extension is available, `ST_*` functions also work on
 .venv/bin/python -m pytest -q
 ```
 
-77 tests, no network, no API key and no Ollama needed. They cover the SQL guard
+83 tests, no network, no API key and no Ollama needed. They cover the SQL guard
 against injection and write attempts, the geodesic length against known distances,
 the tool loop recovering from a bad query, the weekly series matching its real
 anchors exactly, the refusal to compare releases of different scope, every chart
