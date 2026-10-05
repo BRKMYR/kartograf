@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+.pytest_cache/
+query_log.jsonl
+.streamlit/
+# Overture extracts are large and reproducible with fetch_overture.py
+data/overture/

@@ -1,0 +1,413 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Mitte",
+    "population": 375106,
+    "area_km2": 28.3,
+    "zone": "pilot"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       13.375,
+       52.505
+      ],
+      [
+       13.425,
+       52.505
+      ],
+      [
+       13.425,
+       52.535000000000004
+      ],
+      [
+       13.375,
+       52.535000000000004
+      ],
+      [
+       13.375,
+       52.505
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Kreuzberg",
+    "population": 277247,
+    "area_km2": 13.3,
+    "zone": "standard"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       13.395,
+       52.475
+      ],
+      [
+       13.445,
+       52.475
+      ],
+      [
+       13.445,
+       52.505
+      ],
+      [
+       13.395,
+       52.505
+      ],
+      [
+       13.395,
+       52.475
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Charlottenburg",
+    "population": 306416,
+    "area_km2": 25.7,
+    "zone": "pilot"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       13.275,
+       52.495
+      ],
+      [
+       13.325000000000001,
+       52.495
+      ],
+      [
+       13.325000000000001,
+       52.525
+      ],
+      [
+       13.275,
+       52.525
+      ],
+      [
+       13.275,
+       52.495
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Pankow",
+    "population": 205691,
+    "area_km2": 25.6,
+    "zone": "standard"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       13.375,
+       52.555
+      ],
+      [
+       13.425,
+       52.555
+      ],
+      [
+       13.425,
+       52.585
+      ],
+      [
+       13.375,
+       52.585
+      ],
+      [
+       13.375,
+       52.555
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Neukoelln",
+    "population": 347640,
+    "area_km2": 35.9,
+    "zone": "standard"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       13.415,
+       52.464999999999996
+      ],
+      [
+       13.465,
+       52.464999999999996
+      ],
+      [
+       13.465,
+       52.495
+      ],
+      [
+       13.415,
+       52.495
+      ],
+      [
+       13.415,
+       52.464999999999996
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Spandau",
+    "population": 191350,
+    "area_km2": 13.0,
+    "zone": "standard"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       13.174999999999999,
+       52.525
+      ],
+      [
+       13.225,
+       52.525
+      ],
+      [
+       13.225,
+       52.555
+      ],
+      [
+       13.174999999999999,
+       52.555
+      ],
+      [
+       13.174999999999999,
+       52.525
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Depot 1",
+    "district": "Pankow",
+    "capacity": 21,
+    "zone": null
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     13.39874,
+     52.58071
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Depot 2",
+    "district": "Spandau",
+    "capacity": 13,
+    "zone": null
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     13.18298,
+     52.53887
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Depot 3",
+    "district": "Charlottenburg",
+    "capacity": 11,
+    "zone": null
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     13.28821,
+     52.51391
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Depot 4",
+    "district": "Charlottenburg",
+    "capacity": 9,
+    "zone": null
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     13.28479,
+     52.52162
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Depot 5",
+    "district": "Pankow",
+    "capacity": 21,
+    "zone": null
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     13.3872,
+     52.55826
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Depot 6",
+    "district": "Spandau",
+    "capacity": 56,
+    "zone": null
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     13.20059,
+     52.52859
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Depot 7",
+    "district": "Pankow",
+    "capacity": 48,
+    "zone": null
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     13.40962,
+     52.57089
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Depot 8",
+    "district": "Kreuzberg",
+    "capacity": 54,
+    "zone": null
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     13.41996,
+     52.49252
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Depot 9",
+    "district": "Spandau",
+    "capacity": 28,
+    "zone": null
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     13.1858,
+     52.54729
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Depot 10",
+    "district": "Charlottenburg",
+    "capacity": 52,
+    "zone": null
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     13.28167,
+     52.51858
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Depot 11",
+    "district": "Spandau",
+    "capacity": 46,
+    "zone": null
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     13.18727,
+     52.53345
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "name": "Depot 12",
+    "district": "Neukoelln",
+    "capacity": 34,
+    "zone": null
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     13.45606,
+     52.46997
+    ]
+   }
+  }
+ ]
+}

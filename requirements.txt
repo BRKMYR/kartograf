@@ -1,0 +1,9 @@
+streamlit>=1.40
+pandas>=2.2
+duckdb>=1.1
+altair>=5.0
+pydeck>=0.9
+anthropic>=1.5
+ollama>=0.4
+# tests
+pytest>=8.0
