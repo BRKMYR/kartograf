@@ -1,5 +1,7 @@
 # Kartograf
 
+[![tests](https://github.com/BRKMYR/kartograf/actions/workflows/tests.yml/badge.svg)](https://github.com/BRKMYR/kartograf/actions/workflows/tests.yml)
+
 Ask a city map a question. A language model running on your laptop writes
 spatial SQL over open [Overture Maps](https://overturemaps.org) data for
 Frankfurt, DuckDB runs it read-only, and the answer comes back with a chart, the
