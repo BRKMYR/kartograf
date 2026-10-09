@@ -69,3 +69,21 @@ def test_question_file_is_balanced_and_complete():
 def test_frankfurt_preset_resolves():
     assert scopes.scope_name("frankfurt", scopes.PRESETS["frankfurt"]["bbox"]) == "frankfurt"
     assert "Frankfurt" in scopes.label("frankfurt")
+
+
+def test_result_name_is_file_safe():
+    assert run_evals.result_name("llama3.1:8b") == "llama3.1_8b"
+    assert run_evals.result_name("Aleph-Alpha/Kolibri-1") == "Aleph-Alpha--Kolibri-1"
+
+
+def test_latest_results_keeps_newest_run_per_model(tmp_path):
+    def write(name, model, passed):
+        row = {"id": "en01", "passed": passed, **({"model": model} if model else {})}
+        (tmp_path / name).write_text(run_evals.json.dumps(row) + "\n", encoding="utf-8")
+
+    write("2026-10-05_qwen3_8b.jsonl", None, False)            # older file without a model field
+    write("2026-10-09_qwen3_8b.jsonl", "qwen3:8b", True)
+    write("2026-10-09_Aleph-Alpha--Kolibri-1.jsonl", "Aleph-Alpha/Kolibri-1", True)
+    latest = run_evals.latest_results(tmp_path)
+    assert set(latest) == {"qwen3:8b", "Aleph-Alpha/Kolibri-1"}
+    assert latest["qwen3:8b"][0] == "2026-10-09" and latest["qwen3:8b"][1][0]["passed"]

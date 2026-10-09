@@ -5,3 +5,4 @@ query_log.jsonl
 .streamlit/
 # Overture extracts are large and reproducible with fetch_overture.py
 data/overture/
+evals/results/partial/
