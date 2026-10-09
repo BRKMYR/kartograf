@@ -296,6 +296,7 @@ spec in light and dark mode, the kepler page builder, and the eval scorer.
 
 ```bash
 python run_evals.py --model llama3.1:8b --model qwen3:8b
+python run_evals.py --provider openai --base-url http://localhost:8000/v1 --model <name>   # vLLM or any OpenAI-compatible server
 ```
 
 `evals/questions.yaml` holds 20 questions over the Frankfurt extract, 10 in
@@ -318,14 +319,19 @@ category values itself.
 
 Every turn is written to `evals/results/<date>_<model>.jsonl` with the SQL, the
 answer and the verdict, so any borderline call can be re-labelled by hand.
-`evals/results/SUMMARY.md` has the table.
+`evals/results/SUMMARY.md` has the table, with the latest full run of every model,
+so adding a model does not mean re-running the others. Running a large model such
+as Aleph Alpha's Kolibri-1 on a rented GPU is described in
+[`deploy/KOLIBRI.md`](deploy/KOLIBRI.md).
 
-### Baseline, 2026-10-05 (Overture 2026-09-23.1, MacBook with Apple M4 and 16 GB RAM)
+### Results (Overture 2026-09-23.1, MacBook with Apple M4 and 16 GB RAM)
 
 | Model | Correct | English | Deutsch | Refusals | Valid SQL | Median latency |
 |---|---|---|---|---|---|---|
 | llama3.1:8b | 12/20 | 6/10 | 6/10 | 3/4 | 16/16 | 8.9 s |
 | qwen3:8b | 15/20 | 9/10 | 6/10 | 4/4 | 16/16 | 101.3 s |
+| ministral-3:14b | 12/20 | 7/10 | 5/10 | 3/4 | 16/16 | 13.5 s |
+| ministral-3:8b | 11/20 | 5/10 | 6/10 | 3/4 | 16/16 | 11.5 s |
 
 What the failures say:
 
@@ -349,6 +355,13 @@ What the failures say:
   `is_named = TRUE`, which returned 0 because the compact road files omit `is_named`
   when it is true. The loader now restores the default. The same SQL returns the
   expected 9, so both scores are one too low; the next run will show it.
+- **Ministral 3 (Mistral, Apache 2.0) is fast but guesses more.** Both sizes pass
+  `de08` with the loader fix, and at 12 to 14 seconds per question they are 8 times
+  faster than Qwen. They match categories with `ILIKE '%museum%'`-style filters,
+  which over-count: 50 museums instead of 22, 234 restaurants instead of 55. The 14B
+  model answered "0 Baustellen" instead of saying the data has none. In one turn,
+  8B wrote a malformed tool call that Ollama rejected. The fix is the same as for
+  the other models: show the real category values in the prompt.
 
 Small local models are fast enough to explore with. On their own they are not
 reliable enough to trust with a number nobody checks, which is why every answer
